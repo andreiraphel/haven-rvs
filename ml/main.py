@@ -15,15 +15,22 @@ app.add_middleware(
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-EXPORTS  = os.path.join(BASE_DIR, "model_exports")
+# Check both possible locations for Render vs Local
+EXPORTS = os.path.join(BASE_DIR, "model_exports")
+if not os.path.exists(EXPORTS):
+    EXPORTS = "model_exports"
 
 try:
-    model  = pickle.load(open(os.path.join(EXPORTS, "best_model.pkl"),    "rb"))
-    scaler = pickle.load(open(os.path.join(EXPORTS, "scaler.pkl"),        "rb"))
-    le     = pickle.load(open(os.path.join(EXPORTS, "label_encoder.pkl"), "rb"))
-    print("✅ High-Precision Model artifacts loaded.")
+    best_model_path = os.path.join(EXPORTS, "best_model.pkl")
+    scaler_path = os.path.join(EXPORTS, "scaler.pkl")
+    le_path = os.path.join(EXPORTS, "label_encoder.pkl")
+    
+    model  = pickle.load(open(best_model_path, "rb"))
+    scaler = pickle.load(open(scaler_path,     "rb"))
+    le     = pickle.load(open(le_path,         "rb"))
+    print(f"✅ Model artifacts loaded from {EXPORTS}")
 except Exception as e:
-    print(f"⚠️ Warning: Model artifacts not found: {e}")
+    print(f"⚠️ Warning: Model artifacts not found at {EXPORTS}: {e}")
     model = scaler = le = None
 
 # --- MAPPINGS FROM EXCEL ---
