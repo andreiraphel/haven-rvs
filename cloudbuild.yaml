@@ -33,3 +33,13 @@ steps:
 
 images:
   - '${_AR_HOSTNAME}/$PROJECT_ID/cloud-run-source-deploy/${_SERVICE_NAME}:$COMMIT_SHA'
+
+substitutions:
+  _NEXT_PUBLIC_SUPABASE_URL: ''
+  _NEXT_PUBLIC_SUPABASE_ANON_KEY: ''
+  _NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ''
+  _GEMINI_API_KEY: ''
+  _ML_API_URL: ''
+  _DEPLOY_REGION: 'europe-west1'
+  _AR_HOSTNAME: 'europe-west1-docker.pkg.dev'
+  _SERVICE_NAME: 'haven-frontend'
