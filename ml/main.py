@@ -9,7 +9,8 @@ app = FastAPI(title="HAVEN-RVS High-Precision ML Server")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["*"], # Allow all origins for easier deployment
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -256,6 +257,10 @@ def compute_manual_ratings(hazard: dict, vulnerability: dict, exposure: dict = N
     manual_index = (risk_rating / 27) * 10
     
     return manual_index, h_rating, e_rating, v_rating, risk_rating
+
+@app.get("/")
+def health_check():
+    return {"status": "online", "message": "HAVEN-RVS ML Server is Live", "docs": "/docs"}
 
 @app.post("/predict", response_model=PredictResponse)
 def predict(req: PredictRequest):
