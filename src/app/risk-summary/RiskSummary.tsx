@@ -301,7 +301,7 @@ function DetailModal({ assessment: a, onClose }: { assessment: Assessment; onClo
                 <span className="text-lg">🤖</span> AI Assessment Summary
               </div>
               <div className="flex-1 card p-6 bg-bark/[0.03] border-l-4 border-bark relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-2 opacity-5 text-4xl font-serif">"</div>
+                <div className="absolute top-0 right-0 p-2 opacity-5 text-4xl font-serif">&quot;</div>
                 <p className="text-sm leading-relaxed text-ink italic font-serif">
                   {a.result.narrative}
                 </p>

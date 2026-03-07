@@ -260,7 +260,7 @@ function BuildingModal({ assessment: a, onClose }: { assessment: CombinedData; o
                 <span>🤖</span> AI Summary
               </div>
               <p className="text-sm leading-relaxed text-ink italic font-serif">
-                "{a.result.narrative}"
+                &quot;{a.result.narrative}&quot;
               </p>
             </div>
           ) : (
