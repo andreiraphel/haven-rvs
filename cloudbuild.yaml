@@ -1,5 +1,5 @@
 steps:
-  # Build the frontend image
+  # Build the frontend image with correct build arguments
   - name: 'gcr.io/cloud-builders/docker'
     args: [
       'build',
@@ -10,7 +10,7 @@ steps:
       '.'
     ]
 
-  # Push the image to Artifact Registry
+  # Push the image
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', '${_AR_HOSTNAME}/$PROJECT_ID/cloud-run-source-deploy/${_SERVICE_NAME}:$COMMIT_SHA']
 
