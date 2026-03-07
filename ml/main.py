@@ -44,7 +44,7 @@ def load_artifacts():
             size = os.path.getsize(path)
             print(f"DEBUG: File {path} size: {size} bytes")
             if size < 1000:
-                print(f"❌ CRITICAL ERROR: {os.path.basename(path)} is a Git LFS pointer! Please untrack it and re-add as a regular file.")
+                print(f"[ERROR] {os.path.basename(path)} is a Git LFS pointer! Please untrack it and re-add as a regular file.")
 
         scaler = pickle.load(open(s_path, "rb"))
         le     = pickle.load(open(l_path, "rb"))
