@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,10 +15,17 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setError(error.message);
-    else router.push("/dashboard");
-    setLoading(false);
+    try {
+      const sb = getSupabase();
+      console.log("Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) setError(error.message);
+      else router.push("/dashboard");
+    } catch (err: any) {
+      setError(err.message || "Failed to initialize Supabase");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (

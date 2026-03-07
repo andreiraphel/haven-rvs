@@ -5,7 +5,7 @@ import Topbar from "@/components/layout/Topbar";
 import StatCard from "@/components/ui/StatCard";
 import RiskBadge from "@/components/ui/RiskBadge";
 import Modal from "@/components/ui/Modal";
-import { supabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 import type { Assessment, Building, RiskResult } from "@/types";
 
 interface CombinedData {
@@ -23,7 +23,8 @@ export default function DashboardPage() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const sb = getSupabase();
+        const { data: { session } } = await sb.auth.getSession();
         if (!session) return;
 
         const res = await fetch("/api/buildings", {

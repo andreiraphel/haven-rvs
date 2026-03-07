@@ -1,9 +1,20 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder";
+// We use a getter function to ensure we always grab the LATEST environment variables.
+// In Next.js client components, these are baked in during build, but this pattern
+// is safer for ensuring they are available before createClient is called.
+export function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-// Initialize client. 
-// During build time, if vars are missing, it uses placeholders to avoid crashing.
-// During runtime on Cloud Run, the real vars will be used.
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+  if (!url || !key || url.includes("placeholder")) {
+    throw new Error("Supabase credentials missing or invalid.");
+  }
+  return createClient(url, key);
+}
+
+// Keep the export for compatibility, but initialized via the same logic
+export const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co",
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder"
+);
