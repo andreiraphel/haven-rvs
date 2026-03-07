@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+export const dynamic = "force-dynamic";
+
 function getSupabase(req: NextRequest) {
   const authHeader = req.headers.get("Authorization") ?? "";
   return createClient(
