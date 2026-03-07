@@ -1,16 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 
-// Initialize the client using the exact pattern provided
-// It will look for GEMINI_API_KEY in the environment variables
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY
-});
-
 export async function POST(req: NextRequest) {
   try {
     const { buildingName, riskIndex, riskDescription, hazardData, vulnerabilityData, exposureData } =
       await req.json();
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ error: "GEMINI_API_KEY not configured" }, { status: 500 });
+    }
+
+    // Initialize the client inside the handler
+    const ai = new GoogleGenAI({
+      apiKey: apiKey
+    });
 
     const prompt = `You are a Lead Structural Forensic Engineer and Heritage Conservation Specialist. 
     Provide a rigorous, data-driven technical assessment for "${buildingName}".
