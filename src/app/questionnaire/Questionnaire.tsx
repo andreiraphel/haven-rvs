@@ -1,0 +1,526 @@
+"use client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Topbar from "@/components/layout/Topbar";
+import type { Building, HazardIndicators, VulnerabilityIndicators, ExposureIndicators, RiskResult } from "@/types";
+import { supabase } from "@/lib/supabase";
+import { calculateAssessmentRisk } from "@/lib/risk-calculator";
+
+type Step = "building" | "hazard" | "exposure" | "vulnerability" | "result";
+
+const STEPS: { key: Step; label: string; icon: string }[] = [
+  { key: "building",      label: "Building Info",     icon: "🏛️" },
+  { key: "hazard",        label: "Hazard Indicators",  icon: "⚠️" },
+  { key: "exposure",      label: "Value Assessment",   icon: "💎" },
+  { key: "vulnerability", label: "Vulnerability",      icon: "🔩" },
+  { key: "result",        label: "Weight Summary",     icon: "📊" },
+];
+
+function QualitativeSelect({ value, options, onChange }: { value: string; options: string[]; onChange: (v: string) => void }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map(opt => (
+        <button
+          key={opt}
+          type="button"
+          onClick={() => onChange(opt)}
+          className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
+            value === opt
+              ? "bg-bark text-white border-bark shadow-sm"
+              : "bg-white text-[var(--ink-lt)] border-[var(--border)] hover:bg-sand"
+          }`}
+        >
+          {opt}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function SurveySelect({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const options = [
+    { label: "Disagree", val: 1 },
+    { label: "Neutral",  val: 2 },
+    { label: "Agree",    val: 3 },
+  ];
+  return (
+    <div className="flex gap-2">
+      {options.map(opt => (
+        <button
+          key={opt.val}
+          type="button"
+          onClick={() => onChange(opt.val)}
+          className={`flex-1 py-2 rounded-lg border text-xs font-bold transition-all ${
+            value === opt.val
+              ? "bg-bark text-white border-bark shadow-sm"
+              : "bg-white text-[var(--ink-lt)] border-[var(--border)] hover:bg-sand"
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Persistent counter for cycling profiles
+let stubCounter = 0;
+
+export default function QuestionnairePage() {
+  const router = useRouter();
+  const [step, setStep]       = useState<Step>("building");
+  const [building, setBuilding] = useState<Partial<Building>>({});
+  const [hazard, setHazard]   = useState<Partial<HazardIndicators>>({});
+  const [vuln, setVuln]       = useState<Partial<VulnerabilityIndicators>>({});
+  const [exposure, setExposure] = useState<Partial<ExposureIndicators>>({
+    b11: 2, b12: 2, b13: 2, b14: 2,
+    b21: 2, b22: 2, b23: 2, b24: 2, b25: 2,
+    b31: 2, b32: 2, b33: 2, b34: 2,
+    b41: 2, b42: 2, b43: 2, b44: 2
+  });
+  const [isStubFilled, setIsStubFilled] = useState(false);
+  const [result, setResult]   = useState<RiskResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState<string | null>(null);
+
+  const [numInputs, setNumInputs] = useState<Record<string, string>>({});
+
+  function setB(k: string, v: unknown) { setBuilding(f => ({ ...f, [k]: v })); }
+  function setH(k: string, v: unknown) { setHazard(f => ({ ...f, [k]: v })); }
+  function setV(k: string, v: unknown) { setVuln(f => ({ ...f, [k]: v })); }
+  function setE(k: string, v: number) { setExposure(f => ({ ...f, [k]: v })); }
+  
+  function handleNum(k: string, v: string, setter: (k: string, num: number) => void) {
+    setNumInputs(prev => ({ ...prev, [k]: v }));
+    if (v === "" || v === "-") return;
+    const num = parseFloat(v);
+    if (!isNaN(num)) setter(k, num);
+  }
+
+  function fillStub() {
+    setIsStubFilled(true);
+    
+    // profile: 0=Low, 1=Moderate, 2=High
+    const profile = stubCounter % 3;
+    stubCounter++;
+
+    const range = profile === 0 ? [1, 2] : profile === 2 ? [2, 3] : [2, 2.5]; // Moderate needs slightly higher than 2.0 avg
+    const pick = (opts: any[]) => {
+      if (profile === 0) return opts[0];
+      if (profile === 2) return opts[opts.length - 1];
+      // For Moderate, pick middle options or bias towards higher
+      return opts[Math.floor(Math.random() * (opts.length - 1)) + 1];
+    };
+    const randNum = (min: number, max: number) => {
+      if (profile === 0) return min + (max - min) * 0.2;
+      if (profile === 2) return max - (max - min) * 0.1;
+      return min + (max - min) * 0.6; // Moderate
+    };
+    const randScore = () => {
+      if (profile === 1) return Math.random() > 0.5 ? 3 : 2; // Mixed Agree/Neutral for Moderate
+      return Math.floor(Math.random() * (range[1] - range[0] + 1)) + range[0];
+    }
+
+    const stubBuilding = {
+      name: `${["Safe", "Balanced", "Risk"][profile]} Building ${Math.floor(Math.random() * 1000)}`,
+      unique_code: `${["LOW", "MOD", "HIGH"][profile]}-` + Math.random().toString(36).substring(2, 7).toUpperCase(),
+      year_built: profile === 0 ? 2010 : profile === 1 ? 1950 : 1890,
+      address: profile === 0 ? "456 Safety Lane" : profile === 1 ? "789 Average Rd" : "123 Danger Zone",
+      municipality: "Tagbilaran City",
+      province: "Bohol",
+      latitude: 9.6412,
+      longitude: 123.8572,
+      building_type: pick(["Timber Building", "Concrete Building", "Masonry Building"]),
+      building_use: "Residential",
+      number_of_floors: profile === 0 ? 1 : profile === 1 ? 2 : 4
+    };
+
+    const stubHazard = {
+      earthquake_intensity: profile === 1 ? "VI" : pick(["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]),
+      fault_distance_km: randNum(1, 15),
+      fault_name: "Local Fault",
+      seismic_source_type: randNum(6.0, 8.0),
+      potential_liquefaction: profile === 1 ? "Moderately Susceptible" : pick(["Safe", "Least Susceptible", "Moderately Susceptible", "Highly Susceptible"]),
+      basic_wind_speed_kph: randNum(200, 300),
+      terrain: profile === 1 ? "Minimal Obstruction" : pick(["Numerous Obstruction", "Minimal Obstruction", "Flat Terrain"]),
+      slope_degrees: profile === 1 ? "9-30 degrees" : pick(["1-8 degrees", "9-30 degrees", "31-60 degrees"]),
+      elevation_m: randNum(2, 20),
+      distance_to_water_m: randNum(50, 1000),
+      water_body_name: "Inland Creek",
+      surface_runoff: profile === 1 ? "Grass/Concrete" : pick(["Soil", "Grass", "Concrete"]),
+      base_height: profile === 1 ? "Same Level" : pick(["Base is higher", "Same Level", "Base is lower"]),
+      drainage_system: profile === 1 ? "Open drainage system" : pick(["Closed drainage system", "Open drainage system", "No Drainage System"])
+    };
+
+    const stubVuln = {
+      building_code: profile === 1 ? "Post-Code (1972-1991)" : pick(["New Code (1992-present)", "Post-Code (1972-1991)", "Pre-Code (before 1972)"]),
+      plan_irregularity: profile === 1 ? "Irregular Shaped" : pick(["Rectangular", "Square", "T- shaped", "Irregular Shaped", "L-shaped"]),
+      vertical_irregularity: profile === 1 ? "1 Vertical Irregularity" : pick(["No vertical irregularity", "1 Vertical Irregularity", "2 Vertical Irregularities"]),
+      building_proximity: profile === 1 ? "6 inches and above" : pick(["No adjacent buildings", "6 inches and above", "below 6 inches"]),
+      number_of_stories: profile === 0 ? 1 : profile === 1 ? 2 : 4,
+      structural_material: profile === 1 ? "Reinforced Concrete" : pick(["Timber Frame", "Reinforced Concrete", "Unreinforced Masonry"]),
+      structural_framing_type: profile === 1 ? "Shearwall" : pick(["Braced", "Shearwall", "Ordinary Frame"]),
+      number_of_bays: profile === 0 ? 6 : profile === 1 ? 3 : 1,
+      column_spacing_m: profile === 0 ? 2.5 : profile === 1 ? 4.5 : 8.0,
+      building_enclosure: profile === 1 ? "Partially Open" : pick(["Enclosed", "Partially Open", "Open"]),
+      wall_material: profile === 1 ? "Masonry" : pick(["Reinforced Concrete", "Masonry", "Unreinforced Masonry"]),
+      flooring_material: profile === 1 ? "Hardwood" : pick(["Concrete", "Hardwood", "Earth Mud"]),
+      maximum_crack: profile === 0 ? "0.2 mm" : profile === 1 ? "2.5 mm" : "25.0 mm",
+      uneven_settlement: profile === 2,
+      beam_column_deformations: profile === 2,
+      finishing_condition: profile === 2,
+      decay_of_structural_member: profile === 2,
+      additional_loads: profile === 2,
+      roof_design: profile === 1 ? "Gable" : pick(["Hip", "Gable", "Monoslope"]),
+      roof_slope: profile === 1 ? "above 45 degrees" : pick(["30 to 45 degrees", "above 45 degrees", "below 30 degrees"]),
+      roofing_material: profile === 1 ? "Galvanized Iron Sheets" : pick(["Tiles", "Galvanized Iron Sheets", "Thatch"]),
+      roof_fastener: profile === 1 ? "Nails" : pick(["Metal Screw", "Nails", "Staples"]),
+      roof_fastener_distance_mm: profile === 0 ? 150 : profile === 1 ? 350 : 800
+    };
+
+    const stubExposure = {
+      b11: randScore(), b12: randScore(), b13: randScore(), b14: randScore(),
+      b21: profile === 0 ? 1 : profile === 1 ? 2 : 3,
+      b22: randScore(), b23: randScore(), b24: randScore(), b25: randScore(),
+      b31: randScore(), b32: randScore(), b33: randScore(), b34: randScore(),
+      b41: randScore(), b42: randScore(), b43: randScore(), b44: randScore()
+    };
+
+    setBuilding(stubBuilding); setHazard(stubHazard); setVuln(stubVuln); setExposure(stubExposure);
+    const strings: Record<string, string> = {};
+    Object.entries(stubBuilding).forEach(([k, v]) => { if (typeof v === 'number') strings[k] = String(v); });
+    Object.entries(stubHazard).forEach(([k, v]) => { if (typeof v === 'number') strings[k] = String(v); });
+    Object.entries(stubVuln).forEach(([k, v]) => { if (typeof v === 'number') strings[k] = String(v); });
+    setNumInputs(strings);
+  }
+
+  async function computeAndShow() {
+    setLoading(true); setError(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("You must be logged in to submit an assessment.");
+
+      // Manual Computation
+      const manualResult = calculateAssessmentRisk(
+        hazard as HazardIndicators,
+        vuln as VulnerabilityIndicators,
+        Number(building.year_built ?? 1950),
+        isStubFilled,
+        exposure as ExposureIndicators
+      );
+
+      const { data: { session } } = await supabase.auth.getSession();
+      const buildingRes = await fetch("/api/buildings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ ...building, created_by: user.id }),
+      });
+      if (!buildingRes.ok) throw new Error("Failed to save building");
+      const savedBuilding = await buildingRes.json();
+
+      await supabase.from("questionnaire_responses").insert({
+        building_id: savedBuilding.id, step: "final_submission",
+        response: { building, hazard, vulnerability: vuln, exposure }
+      });
+
+      // Calculate b21 based on age
+      const age = 2024 - Number(building.year_built ?? 2024);
+      const b21 = age <= 75 ? 1 : age <= 125 ? 2 : 3;
+      const finalExposure = { ...exposure, b21, building_id: savedBuilding.id };
+
+      // Fetch ML Prediction
+      let mlPred = 0;
+      try {
+        const mlRes = await fetch("/api/predict", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            hazard: hazard,
+            vulnerability: vuln,
+            exposure: finalExposure,
+            year_built: Number(building.year_built ?? 1950),
+            isStub: isStubFilled
+          }),
+        });
+        if (mlRes.ok) {
+          const mlData = await mlRes.json();
+          mlPred = mlData.ml_prediction;
+        }
+      } catch (mlErr) { console.error("ML Prediction failed:", mlErr); }
+
+      // 3. Save all indicators
+      const [hRes, vRes, eRes] = await Promise.all([
+        supabase.from("hazard_indicators").insert({ ...hazard, building_id: savedBuilding.id }),
+        supabase.from("vulnerability_indicators").insert({ ...vuln, building_id: savedBuilding.id }),
+        supabase.from("exposure_indicators").insert(finalExposure)
+      ]);
+
+      if (hRes.error) throw new Error(`Hazard data failed: ${hRes.error.message}`);
+      if (vRes.error) throw new Error(`Vulnerability data failed: ${vRes.error.message}`);
+      if (eRes.error) throw new Error(`Exposure data failed: ${eRes.error.message}`);
+
+      // 4. Generate AI Narrative & COA
+      let aiNarrative = ""; let aiCOA = "";
+      try {
+        const geminiRes = await fetch("/api/gemini", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            buildingName: building.name, 
+            riskIndex: manualResult.risk_index,
+            riskDescription: manualResult.risk_description, 
+            hazardData: hazard, 
+            vulnerabilityData: vuln,
+            exposureData: finalExposure,
+          }),
+        });
+        if (geminiRes.ok) {
+          const gData = await geminiRes.json();
+          aiNarrative = gData.narrative; aiCOA = gData.courseOfAction;
+        }
+      } catch (gErr) { console.error("Gemini failed:", gErr); }
+
+      if (!aiNarrative) aiNarrative = `Assessment for ${building.name}: Index ${manualResult.risk_index.toFixed(2)} (${manualResult.risk_description}).`;
+      if (!aiCOA) aiCOA = "1. Structural audit\n2. Connection check\n3. Decay check\n4. Disaster plan";
+
+      // 5. Finalize Result (ML is primary, Manual is fallback/support)
+      const primaryIndex = mlPred > 0 ? mlPred : manualResult.risk_index;
+      
+      // Determine description based on the Primary (ML) Index
+      let finalDesc: RiskLevel = "LOW RISK";
+      if (primaryIndex <= 3.58) finalDesc = "LOW RISK";
+      else if (primaryIndex <= 6.79) finalDesc = "MODERATE RISK";
+      else finalDesc = "HIGH RISK";
+
+      const { error: rErr } = await supabase.from("risk_results").insert({
+        building_id: savedBuilding.id, 
+        risk_index: primaryIndex, // Save ML index as the main index
+        risk_description: finalDesc, 
+        hazard_rating: manualResult.hazard_rating,
+        vulnerability_rating: manualResult.vulnerability_rating, 
+        exposure_rating: manualResult.exposure_rating,
+        risk_rating: manualResult.risk_rating, 
+        ml_prediction: mlPred,
+        manual_index: manualResult.risk_index, // Store manual index separately for reference
+        narrative: aiNarrative, 
+        ai_course_of_action: aiCOA,
+        assessed_by: user.id,
+      });
+
+      if (rErr) throw new Error(`Risk result failed: ${rErr.message}`);
+
+      setResult({ 
+        ...manualResult, 
+        building_id: savedBuilding.id, 
+        risk_index: primaryIndex,
+        risk_description: finalDesc,
+        ml_prediction: mlPred, 
+        manual_index: manualResult.risk_index, // Add this line
+        narrative: aiNarrative, 
+        ai_course_of_action: aiCOA 
+      });
+      setStep("result");
+    } catch (err: any) {
+      setError(err.message);
+    } finally { setLoading(false); }
+  }
+
+  const stepIdx = STEPS.findIndex(s => s.key === step);
+  const riskColor = result ? result.risk_description === "LOW RISK" ? "text-[var(--risk-low)] bg-[var(--risk-low-bg)] border-[#b7e4cb]" : result.risk_description === "MODERATE RISK" ? "text-[var(--risk-mod)] bg-[var(--risk-mod-bg)] border-[#ffe0a0]" : "text-[var(--risk-high)] bg-[var(--risk-high-bg)] border-[#f5b8b8]" : "";
+
+  return (
+    <>
+      <Topbar />
+      <main className="max-w-3xl mx-auto px-6 py-8">
+        <div className="mb-7 flex justify-between items-start">
+          <div>
+            <h2 className="font-sora font-bold text-2xl text-ink">New Assessment</h2>
+            <p className="text-[var(--ink-lt)] text-sm mt-1">Fill in all sections based on structural audit reference.</p>
+          </div>
+          <button onClick={fillStub} className="btn-secondary text-[10px] uppercase tracking-widest px-3 py-1.5 shadow-sm">⚡ Fill Test Data</button>
+        </div>
+
+        <div className="flex items-center mb-8">
+          {STEPS.map((s, i) => (
+            <div key={s.key} className="flex items-center flex-1 last:flex-none">
+              <div className="flex flex-col items-center cursor-pointer" onClick={() => i <= stepIdx && setStep(s.key)}>
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-base transition-colors ${i < stepIdx  ? "bg-terracotta text-white" : i === stepIdx ? "bg-bark text-white" : "bg-[var(--border)] text-[var(--ink-lt)]"}`}>{i < stepIdx ? "✓" : s.icon}</div>
+                <span className={`text-xs mt-1.5 font-medium ${i === stepIdx ? "text-ink" : "text-[var(--ink-lt)]"}`}>{s.label}</span>
+              </div>
+              {i < STEPS.length - 1 && <div className={`h-0.5 flex-1 mx-2 mt-[-16px] ${i < stepIdx ? "bg-terracotta" : "bg-[var(--border)]"}`} />}
+            </div>
+          ))}
+        </div>
+
+        {error && <div className="mb-5 rounded-lg border border-red-300 bg-red-50 px-5 py-4 text-sm text-red-700">⚠️ {error}</div>}
+
+        <div className="card p-8">
+          {step === "building" && (
+            <div className="space-y-5">
+              <h3 className="font-sora font-bold text-lg text-ink">Building Information</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2"><label className="label-sm block mb-2">Building Name *</label><input className="input-field" value={building.name ?? ""} onChange={e => setB("name", e.target.value)} /></div>
+                <div><label className="label-sm block mb-2">Unique Code *</label><input className="input-field" value={building.unique_code ?? ""} onChange={e => setB("unique_code", e.target.value)} /></div>
+                <div><label className="label-sm block mb-2">Year Built</label><input className="input-field" value={numInputs.year_built ?? building.year_built ?? ""} onChange={e => handleNum("year_built", e.target.value, setB)} /></div>
+                <div className="col-span-2"><label className="label-sm block mb-2">Address</label><input className="input-field" value={building.address ?? ""} onChange={e => setB("address", e.target.value)} /></div>
+                <div><label className="label-sm block mb-2">Municipality</label><input className="input-field" value={building.municipality ?? ""} onChange={e => setB("municipality", e.target.value)} /></div>
+                <div><label className="label-sm block mb-2">Province</label><input className="input-field" value={building.province ?? ""} onChange={e => setB("province", e.target.value)} /></div>
+                <div><label className="label-sm block mb-2">Latitude</label><input className="input-field" value={numInputs.latitude ?? building.latitude ?? ""} onChange={e => handleNum("latitude", e.target.value, setB)} /></div>
+                <div><label className="label-sm block mb-2">Longitude</label><input className="input-field" value={numInputs.longitude ?? building.longitude ?? ""} onChange={e => handleNum("longitude", e.target.value, setB)} /></div>
+                <div><label className="label-sm block mb-2">Building Type</label><select className="input-field" value={building.building_type ?? ""} onChange={e => setB("building_type", e.target.value)}><option value="">Select…</option><option>Timber Building</option><option>Concrete Building</option><option>Masonry Building</option></select></div>
+                <div><label className="label-sm block mb-2">Building Use</label><select className="input-field" value={building.building_use ?? ""} onChange={e => setB("building_use", e.target.value)}><option value="">Select…</option><option>Residential</option><option>Commercial</option><option>Mixed Use</option></select></div>
+                <div><label className="label-sm block mb-2">Floors</label><input className="input-field" value={numInputs.number_of_floors ?? building.number_of_floors ?? ""} onChange={e => handleNum("number_of_floors", e.target.value, setB)} /></div>
+              </div>
+              <div className="flex justify-end pt-2"><button className="btn-primary" onClick={() => setStep("hazard")}>Next: Hazard →</button></div>
+            </div>
+          )}
+
+          {step === "hazard" && (
+            <div className="space-y-6">
+              <h3 className="font-sora font-bold text-lg text-ink">Hazard Indicators</h3>
+              <Section title="A1 — Seismic">
+                <QField label="A1.1 Intensity (PEIS)" sub="Low(IV-) ; Mod(V-VI) ; High(VII+)"><QualitativeSelect value={hazard.earthquake_intensity ?? ""} options={["I","II","III","IV","V","VI","VII","VIII","IX","X"]} onChange={v => setH("earthquake_intensity",v)} /></QField>
+                <QField label="A1.2 Fault Distance (km)" sub="Low(>10) ; Mod(5-10) ; High(<5)"><input className="input-field" value={numInputs.fault_distance_km ?? hazard.fault_distance_km ?? ""} onChange={e => handleNum("fault_distance_km", e.target.value, setH)} /></QField>
+                <QField label="A1.3 Source (Mw)" sub="Low(<6.5) ; Mod(6.5-7) ; High(7-8.4)"><input className="input-field" value={numInputs.seismic_source_type ?? hazard.seismic_source_type ?? ""} onChange={e => handleNum("seismic_source_type", e.target.value, setH)} /></QField>
+                <QField label="A1.4 Liquefaction" sub="Low(Safe) ; Mod(Moderate) ; High(Highly)"><QualitativeSelect value={hazard.potential_liquefaction ?? ""} options={["Safe","Least Susceptible","Moderately Susceptible","Highly Susceptible"]} onChange={v => setH("potential_liquefaction",v)} /></QField>
+              </Section>
+              <Section title="A2 — Wind">
+                <QField label="A2.1 Wind Speed (kph)" sub="Low(<=225) ; Mod(226-279) ; High(>=280)"><input className="input-field" value={numInputs.basic_wind_speed_kph ?? hazard.basic_wind_speed_kph ?? ""} onChange={e => handleNum("basic_wind_speed_kph", e.target.value, setH)} /></QField>
+                <QField label="A2.2 Vicinity" sub="Low(Numerous) ; Mod(Minimal) ; High(Flat)"><QualitativeSelect value={hazard.terrain ?? ""} options={["Numerous Obstruction","Minimal Obstruction","Flat Terrain"]} onChange={v => setH("terrain",v)} /></QField>
+              </Section>
+              <Section title="A3 — Flood/Geo">
+                <QField label="A3.1 Slope" sub="Low(1-8°) ; Mod(9-30°) ; High(>30°)"><QualitativeSelect value={hazard.slope_degrees ?? ""} options={["1-8 degrees","9-30 degrees","31-60 degrees","above 60 degrees"]} onChange={v => setH("slope_degrees",v)} /></QField>
+                <QField label="A3.2 Elevation (m)" sub="Low(>10) ; Mod(5-10) ; High(<5)"><input className="input-field" value={numInputs.elevation_m ?? hazard.elevation_m ?? ""} onChange={e => handleNum("elevation_m", e.target.value, setH)} /></QField>
+                <QField label="A3.3 Dist. to Water (m)" sub="Low(>500) ; Mod(200-500) ; High(<200)"><input className="input-field" value={numInputs.distance_to_water_m ?? hazard.distance_to_water_m ?? ""} onChange={e => handleNum("distance_to_water_m", e.target.value, setH)} /></QField>
+                <QField label="A3.4 Surface" sub="Low(Grass) ; Mod(Clay) ; High(Concrete)"><QualitativeSelect value={hazard.surface_runoff ?? ""} options={["Soil","Grass","Grass/Soil","Grass/Concrete","Concrete"]} onChange={v => setH("surface_runoff",v)} /></QField>
+                <QField label="A3.5 Base Height" sub="Low(Higher) ; Mod(Same) ; High(Lower)"><QualitativeSelect value={hazard.base_height ?? ""} options={["Base is higher","Same Level","Base is lower"]} onChange={v => setH("base_height",v)} /></QField>
+                <QField label="A3.6 Drainage" sub="Low(Maint.) ; Mod(Seldom) ; High(No)"><QualitativeSelect value={hazard.drainage_system ?? ""} options={["Closed drainage system","Open drainage system","No Drainage System"]} onChange={v => setH("drainage_system",v)} /></QField>
+              </Section>
+              <div className="flex justify-between pt-2"><button className="btn-secondary" onClick={() => setStep("building")}>← Back</button><button className="btn-primary" onClick={() => setStep("exposure")}>Next: Values →</button></div>
+            </div>
+          )}
+
+          {step === "exposure" && (
+            <div className="space-y-6">
+              <h3 className="font-sora font-bold text-lg text-ink">Value Assessment (Exposure)</h3>
+              
+              <Section title="B1 — Architectural Value">
+                <QField label="B1.1 Theme & Proportion" sub="The aesthetic theme reflects building's proportion, decoration and landscape."><SurveySelect value={exposure.b11!} onChange={v => setE("b11", v)} /></QField>
+                <QField label="B1.2 Uniqueness" sub="The architectural style is eye-catching and unique."><SurveySelect value={exposure.b12!} onChange={v => setE("b12", v)} /></QField>
+                <QField label="B1.3 Typical Style" sub="The style is typical of its prevailing style during its era."><SurveySelect value={exposure.b13!} onChange={v => setE("b13", v)} /></QField>
+                <QField label="B1.4 Integration" sub="The style beautifully integrates into the cityscape."><SurveySelect value={exposure.b14!} onChange={v => setE("b14", v)} /></QField>
+              </Section>
+
+              <Section title="B2 — Historical Value">
+                <QField label="B2.1 Age of Building" sub="Low (50-75) ; Moderate (76 to 125) ; High (126+ years)">
+                  <div className="text-sm font-bold text-terracotta bg-sand px-3 py-2 rounded-lg border border-bark/20 inline-block">
+                    {2024 - Number(building.year_built ?? 2024)} years old
+                  </div>
+                </QField>
+                <QField label="B2.2 Relevance" sub="past is relevant as I am able to identify with the culture and history."><SurveySelect value={exposure.b22!} onChange={v => setE("b22", v)} /></QField>
+                <QField label="B2.3 Geog. Impact" sub="Local=1 ; Regional=2 ; National=3"><SurveySelect value={exposure.b23!} onChange={v => setE("b23", v)} /></QField>
+                <QField label="B2.4 Heritage Tie" sub="History strongly ties in the area's cultural heritage."><SurveySelect value={exposure.b24!} onChange={v => setE("b24", v)} /></QField>
+                <QField label="B2.5 Important Message" sub="Relays an important message worth preserving."><SurveySelect value={exposure.b25!} onChange={v => setE("b25", v)} /></QField>
+              </Section>
+
+              <Section title="B3 — Social Value">
+                <QField label="B3.1 Promotion" sub="Initiatives were seen to promote this property."><SurveySelect value={exposure.b31!} onChange={v => setE("b31", v)} /></QField>
+                <QField label="B3.2 Suggestions" sub="Prominent people strongly suggest for its conservation."><SurveySelect value={exposure.b32!} onChange={v => setE("b32", v)} /></QField>
+                <QField label="B3.3 Importance" sub="Strong sense of importance in the people's daily lives."><SurveySelect value={exposure.b33!} onChange={v => setE("b33", v)} /></QField>
+                <QField label="B3.4 No Efforts (Inverted)" sub="No efforts were made to further promote this building."><SurveySelect value={exposure.b34!} onChange={v => setE("b34", v)} /></QField>
+              </Section>
+
+              <Section title="B4 — Socio-Economic Value">
+                <QField label="B4.1 Tourist Attraction" sub="Must-see for the tourists eager to visit the area."><SurveySelect value={exposure.b41!} onChange={v => setE("b41", v)} /></QField>
+                <QField label="B4.2 Tourism Contrib." sub="Contributes to overall tourism in the community."><SurveySelect value={exposure.b42!} onChange={v => setE("b42", v)} /></QField>
+                <QField label="B4.3 Goods & Services" sub="Often visited for its goods and services."><SurveySelect value={exposure.b43!} onChange={v => setE("b43", v)} /></QField>
+                <QField label="B4.4 Adaptive Use" sub="Adopts needs of community without sacrificing culture."><SurveySelect value={exposure.b44!} onChange={v => setE("b44", v)} /></QField>
+              </Section>
+
+              <div className="flex justify-between pt-2"><button className="btn-secondary" onClick={() => setStep("hazard")}>← Back</button><button className="btn-primary" onClick={() => setStep("vulnerability")}>Next: Vulnerability →</button></div>
+            </div>
+          )}
+
+          {step === "vulnerability" && (
+            <div className="space-y-6">
+              <h3 className="font-sora font-bold text-lg text-ink">Vulnerability Assessment</h3>
+              
+              <Section title="C1 — Structural System">
+                <QField label="C1.1 Code Year Built" sub="Low (1992+) ; Moderate (1972-1991) ; High (Pre-1972)"><QualitativeSelect value={vuln.building_code ?? ""} options={["New Code (1992-present)","Post-Code (1972-1991)","Pre-Code (before 1972)"]} onChange={v => setV("building_code",v)} /></QField>
+                <QField label="C1.2 Plan Irregularity" sub="Low (Regular) ; Moderate (Symmetric T,U,C) ; High (L-shaped)"><QualitativeSelect value={vuln.plan_irregularity ?? ""} options={["Rectangular", "Square", "T- shaped", "Irregular Shaped", "L-shaped"]} onChange={v => setV("plan_irregularity",v)} /></QField>
+                <QField label="C1.3 Vertical Irregularity" sub="Low (None) ; Moderate (1) ; High (2+)"><QualitativeSelect value={vuln.vertical_irregularity ?? ""} options={["No vertical irregularity", "1 Vertical Irregularity", "2 Vertical Irregularities"]} onChange={v => setV("vertical_irregularity",v)} /></QField>
+                <QField label="C1.4 Proximity / Pounding" sub="Low (No adjacent) ; Moderate (>6 inches) ; High (<6 inches)"><QualitativeSelect value={vuln.building_proximity ?? ""} options={["No adjacent buildings", "6 inches and above", "below 6 inches"]} onChange={v => setV("building_proximity",v)} /></QField>
+                <QField label="C1.5 Number of Storeys" sub="Low (1) ; Moderate (2) ; High (3+)"><input className="input-field" value={numInputs.number_of_stories ?? vuln.number_of_stories ?? ""} onChange={e => handleNum("number_of_stories", e.target.value, setV)} /></QField>
+                <QField label="C1.6 System Material" sub="Low (Timber/LS) ; Moderate (RC/Steel) ; High (URM)"><QualitativeSelect value={vuln.structural_material ?? ""} options={["Timber Frame","Light Steel Frame","Reinforced Concrete","Steel","Unreinforced Masonry"]} onChange={v => setV("structural_material",v)} /></QField>
+                <QField label="C1.7 Number of Bays" sub="Low (5+) ; Moderate (3-4) ; High (<3)"><input className="input-field" value={numInputs.number_of_bays ?? vuln.number_of_bays ?? ""} onChange={e => handleNum("number_of_bays", e.target.value, setV)} /></QField>
+                <QField label="C1.8 Column Spacing (m)" sub="Low (<3m) ; Moderate (3-5m) ; High (>5m)"><input className="input-field" value={numInputs.column_spacing_m ?? vuln.column_spacing_m ?? ""} onChange={e => handleNum("column_spacing_m", e.target.value, setV)} /></QField>
+                <QField label="C1.9 Building Enclosure" sub="Low (Enclosed) ; Moderate (Partial) ; High (Open)"><QualitativeSelect value={vuln.building_enclosure ?? ""} options={["Enclosed", "Partially Open", "Open"]} onChange={v => setV("building_enclosure",v)} /></QField>
+                <QField label="C1.10 Wall Material" sub="Low (RC) ; Moderate (RM) ; High (URM/Wood/Glass)"><QualitativeSelect value={vuln.wall_material ?? ""} options={["Reinforced Concrete", "Reinforced Masonry", "Unreinforced Masonry", "Wood", "Bamboo", "Glass", "Masonry"]} onChange={v => setV("wall_material",v)} /></QField>
+                <QField label="C1.11 Framing Type" sub="Low (Braced/SMRF) ; Moderate (Shearwall) ; High (Ordinary)"><QualitativeSelect value={vuln.structural_framing_type ?? ""} options={["Braced","Special Moment-Resisting Frame","Shearwall","Ordinary Frame"]} onChange={v => setV("structural_framing_type",v)} /></QField>
+                <QField label="C1.12 Flooring Material" sub="Low (Tiles/RC) ; Moderate (Hardwood/Bamboo) ; High (Mud)"><QualitativeSelect value={vuln.flooring_material ?? ""} options={["Concrete", "Tiles", "Hardwood", "Bamboo", "Earth Mud"]} onChange={v => setV("flooring_material",v)} /></QField>
+              </Section>
+
+              <Section title="C2 — Building Condition">
+                <QField label="C2.1 Maximum Crack Width" sub="Low (<1mm) ; Moderate (1-3mm) ; High (>3mm)"><input className="input-field" value={vuln.maximum_crack ?? ""} onChange={e => setV("maximum_crack", e.target.value)} /></QField>
+                {([
+                  { key: "uneven_settlement",          label: "C2.2 Uneven Settlement / Inclination?" },
+                  { key: "beam_column_deformations",   label: "C2.3 Beam and Column Deformations?" },
+                  { key: "finishing_condition",         label: "C2.4 Finishing Condition Deterioration?" },
+                  { key: "decay_of_structural_member", label: "C2.5 Decay of Structural Members?" },
+                  { key: "additional_loads",           label: "C2.6 Additional Loads / Gatherings?" },
+                ] as { key: keyof VulnerabilityIndicators; label: string }[]).map(f => (
+                  <div key={f.key} className="flex items-center justify-between py-2 border-b border-sand last:border-0">
+                    <span className="text-sm text-ink">{f.label}</span>
+                    <div className="flex gap-3">
+                      {["No", "Yes"].map(opt => (
+                        <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                          <input type="radio" checked={(vuln as Record<string, boolean>)[f.key] === (opt === "Yes")} onChange={() => setV(f.key, opt === "Yes")} className="accent-bark" />
+                          <span className="text-sm text-[var(--ink-lt)]">{opt}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </Section>
+
+              <Section title="C3 & C4 — Roof & Fasteners">
+                <QField label="C3.1 Roof Design" sub="Low (Hip) ; Moderate (Dutch/Gable) ; High (Monoslope)"><QualitativeSelect value={vuln.roof_design ?? ""} options={["Hip","Dutch Hip","Gable","Cross Hip Roof","Monoslope"]} onChange={v => setV("roof_design",v)} /></QField>
+                <QField label="C3.2 Roof Slope" sub="Low (30-45°) ; Moderate (>45°) ; High (<30°)"><QualitativeSelect value={vuln.roof_slope ?? ""} options={["30 to 45 degrees", "above 45 degrees", "below 30 degrees"]} onChange={v => setV("roof_slope",v)} /></QField>
+                <QField label="C3.3 Roofing Material" sub="Low (Tiles/RC) ; Moderate (GI/Metal) ; High (Wood/Thatch)"><QualitativeSelect value={vuln.roofing_material ?? ""} options={["Tiles", "Concrete", "Galvanized Iron Sheets", "Metals", "Asphalt Shingles", "Wood", "Thatch", "Shingles"]} onChange={v => setV("roofing_material",v)} /></QField>
+                <QField label="C4.1 Roof Fasteners" sub="Low (Screw) ; Moderate (Nails) ; High (Staples)"><QualitativeSelect value={vuln.roof_fastener ?? ""} options={["Metal Screw", "Nails", "Staples", "Hazel Spars"]} onChange={v => setV("roof_fastener",v)} /></QField>
+                <QField label="C4.2 Fastener Spacing (mm)" sub="Low (<225) ; Moderate (226-450) ; High (>450)"><input className="input-field" value={numInputs.roof_fastener_distance_mm ?? vuln.roof_fastener_distance_mm ?? ""} onChange={e => handleNum("roof_fastener_distance_mm", e.target.value, setV)} /></QField>
+              </Section>
+
+              <div className="flex justify-between pt-2"><button className="btn-secondary" onClick={() => setStep("exposure")}>← Back</button><button className="btn-primary" onClick={computeAndShow} disabled={loading}>{loading ? "Computing…" : "Compute Index →"}</button></div>
+            </div>
+          )}
+
+          {step === "result" && result && (
+            <div className="space-y-6 text-center">
+              <h3 className="font-sora font-bold text-xl text-ink">Assessment Result</h3>
+              <div className={`p-8 rounded-2xl border-4 ${riskColor}`}>
+                <div className="text-sm font-bold tracking-widest uppercase opacity-70 mb-2">Statistical Risk Index</div>
+                <div className="text-7xl font-extrabold mb-2">{result.risk_index.toFixed(2)}</div>
+                <div className="text-xl font-bold">{result.risk_description}</div>
+                
+                <div className="mt-4 pt-4 border-t border-current/20 text-xs font-medium">
+                  <span className="opacity-70">Manual Verification: </span>
+                  <span className="font-bold">{result.manual_index?.toFixed(2) ?? "—"}</span>
+                </div>
+              </div>
+              <button className="btn-primary w-full py-4" onClick={() => router.push("/risk-summary")}>View All Summary →</button>
+            </div>
+          )}
+        </div>
+      </main>
+    </>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (<div className="border-t border-sand pt-6 mt-6 first:border-0 first:pt-0 first:mt-0"><h4 className="text-[10px] uppercase tracking-widest font-bold text-bark mb-4">{title}</h4><div className="space-y-4">{children}</div></div>);
+}
+
+function QField({ label, sub, children }: { label: string; sub?: string; children: React.ReactNode }) {
+  return (<div><label className="block mb-2"><span className="text-sm font-bold text-ink">{label}</span>{sub && <span className="block text-[10px] text-[var(--ink-lt)] mt-0.5">{sub}</span>}</label>{children}</div>);
+}

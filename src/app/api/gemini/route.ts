@@ -1,0 +1,87 @@
+import { NextRequest, NextResponse } from "next/server";
+import { GoogleGenAI } from "@google/genai";
+
+// Initialize the client using the exact pattern provided
+// It will look for GEMINI_API_KEY in the environment variables
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY
+});
+
+export async function POST(req: NextRequest) {
+  try {
+    const { buildingName, riskIndex, riskDescription, hazardData, vulnerabilityData, exposureData } =
+      await req.json();
+
+    const prompt = `You are a Lead Structural Forensic Engineer and Heritage Conservation Specialist. 
+    Provide a rigorous, data-driven technical assessment for "${buildingName}".
+
+    ENGINEERING DATASET:
+    - Statistical Risk Index: ${riskIndex}/10
+    - Risk Classification: ${riskDescription}
+    - Hazard Profile: ${JSON.stringify(hazardData)}
+    - Structural Vulnerability: ${JSON.stringify(vulnerabilityData)}
+    - Heritage/Exposure Value: ${JSON.stringify(exposureData)}
+
+    PHASE 1: NARRATIVE TECHNICAL SUMMARY (Exactly 5 sentences):
+    - Tone: Forensic and conservative.
+    - Analysis: Cross-reference Hazard and Vulnerability.
+    - Codes: Reference National Structural Code of the Philippines (NSCP 2015).
+
+    PHASE 2: PRIORITIZED COURSE OF ACTION (6 steps):
+    - Priority 1: Life-safety stabilization.
+    - Priority 2: Non-Destructive Testing (UPV, Rebar Mapping, etc).
+    - Priority 3: Engineering retrofitting (CFRP, Steel Jacketing, etc).
+    - Priority 4: Heritage compliance (RA 10066).
+    - Priority 5: Geotechnical/Foundation address.
+    - Priority 6: Monitoring protocols.
+
+    RESPONSE FORMAT: Return ONLY a JSON object with keys "narrative" and "courseOfAction". 
+    Format Course of Action as: 1. **[Heading]** [Detail]\\n2. **[Heading]** [Detail]...`;
+
+    // Tiered Fallback: 3 -> 2.0 -> 1.5
+    let response;
+    const models = ["gemini-3-flash-preview", "gemini-2.0-flash", "gemini-1.5-flash"];
+    let lastError;
+
+    for (const modelName of models) {
+      try {
+        response = await ai.models.generateContent({
+          model: modelName,
+          contents: prompt,
+        });
+        if (response) break; // Success!
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`${modelName} failed (status: ${err.status}). Trying next...`);
+        // Small delay before trying next model to allow 429s to breathe
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    if (!response) {
+      throw lastError || new Error("All AI models failed to respond.");
+    }
+
+    const text = response.text;
+    
+    // Clean and parse the response
+    let cleanText = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    
+    try {
+      const parsed = JSON.parse(cleanText);
+      return NextResponse.json({ 
+        narrative: parsed.narrative || "No narrative generated.", 
+        courseOfAction: parsed.courseOfAction || "1. Perform structural audit." 
+      });
+    } catch (e) {
+      console.error("Gemini 3 Implementation Parse Error:", text);
+      return NextResponse.json({ 
+        narrative: text.substring(0, 500), 
+        courseOfAction: "1. **Parsing Error** AI output format was unexpected." 
+      });
+    }
+  } catch (err: any) {
+    console.error("Gemini 3 Implementation SDK Error:", err);
+    return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 });
+  }
+}
