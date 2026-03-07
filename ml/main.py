@@ -33,21 +33,28 @@ def load_artifacts():
         EXPORTS = "model_exports"
 
     try:
-        # Load scaler and label encoder
-        scaler = pickle.load(open(os.path.join(EXPORTS, "scaler.pkl"), "rb"))
-        le     = pickle.load(open(os.path.join(EXPORTS, "label_encoder.pkl"), "rb"))
-        
-        # Load Index Regressor
+        m_path = os.path.join(EXPORTS, "best_model.json")
+        s_path = os.path.join(EXPORTS, "scaler.pkl")
+        l_path = os.path.join(EXPORTS, "label_encoder.pkl")
+        c_path = os.path.join(EXPORTS, "classifier_model.json")
+
+        # Check for LFS pointers
+        for path in [m_path, s_path, l_path, c_path]:
+            if not os.path.exists(path): continue
+            size = os.path.getsize(path)
+            print(f"DEBUG: File {path} size: {size} bytes")
+            if size < 1000:
+                print(f"⚠️ WARNING: {os.path.basename(path)} is an LFS pointer!")
+
+        scaler = pickle.load(open(s_path, "rb"))
+        le     = pickle.load(open(l_path, "rb"))
         model_idx = XGBRegressor()
-        model_idx.load_model(os.path.join(EXPORTS, "best_model.json"))
-        
-        # Load Category Classifier
+        model_idx.load_model(m_path)
         model_clf = XGBClassifier()
-        model_clf.load_model(os.path.join(EXPORTS, "classifier_model.json"))
-        
-        print(f"✅ Dual-Engine Model artifacts loaded successfully")
+        model_clf.load_model(c_path)
+        print(f"✅ Model artifacts loaded successfully")
     except Exception as e:
-        print(f"❌ CRITICAL: Failed to load artifacts: {e}")
+        print(f"❌ CRITICAL ERROR during loading: {e}")
 
 # --- SCHEMAS ---
 class PredictRequest(BaseModel):
@@ -65,9 +72,9 @@ class PredictResponse(BaseModel):
     exposure_rating: float
     risk_rating: float
     ml_prediction: float
-    ml_category: str # Added field for the direct classification
+    ml_category: str
 
-# --- MAPPINGS FROM EXCEL ---
+# --- MAPPINGS ---
 def get_peis_score(v):
     if v in ["I", "II", "III", "IV"]: return 1
     if v in ["V", "VI"]: return 2
@@ -151,6 +158,7 @@ def encode_inputs(hazard: dict, vulnerability: dict, exposure: dict = None, year
     stories = int(v.get("number_of_stories", 1))
     bays = int(v.get("number_of_bays", 5)); spacing = float(v.get("column_spacing_m", 2))
     f_dist = 1 if float(v.get("roof_fastener_distance_mm", 200)) <= 225 else 2 if float(v.get("roof_fastener_distance_mm", 200)) <= 450 else 3
+    
     return [
         peis, fault, source, liq, wind, terrain, slope, elev, water, runoff, base, drain,
         b11, b12, b13, b14, age_s, b22, b23, b24, b25, b31, b32, b33, b34, b41, b42, b43, b44,
@@ -164,8 +172,6 @@ def encode_inputs(hazard: dict, vulnerability: dict, exposure: dict = None, year
 def predict(req: PredictRequest):
     try:
         load_artifacts()
-        
-        # Calculate manual ratings
         h = req.hazard; v = req.vulnerability; e = req.exposure
         def_score = 3 if req.isStub else 2
         a1 = (get_peis_score(h.get("earthquake_intensity")) * 0.224) + (get_fault_score(h.get("fault_distance_km", 10)) * 0.185) + (get_source_score(h.get("seismic_source_type", 7.0)) * 0.364) + (LIQ_MAP.get(h.get("potential_liquefaction"), 2) * 0.227)
@@ -196,22 +202,21 @@ def predict(req: PredictRequest):
         risk_rating = h_rating * e_rating * v_rating
         manual_idx = (risk_rating / 27) * 10
 
-        # Predict
         ml_val = 0.0; ml_cat = "UNKNOWN"
         if model_idx and model_clf and scaler:
-            features = encode_inputs(req.hazard, req.vulnerability, req.exposure, req.year_built, req.isStub)
-            X_scaled = scaler.transform([features])
+            feats = encode_inputs(req.hazard, req.vulnerability, req.exposure, req.year_built, req.isStub)
+            X_scaled = scaler.transform([feats])
             ml_val = round(float(model_idx.predict(X_scaled)[0]), 4)
             cat_idx = int(model_clf.predict(X_scaled)[0])
             ml_cat = le.inverse_transform([cat_idx])[0]
 
         desc = "LOW RISK" if manual_idx <= 3.58 else "MODERATE RISK" if manual_idx <= 6.79 else "HIGH RISK"
-        return PredictResponse(
-            risk_index=round(float(manual_idx), 4), risk_description=desc,
-            hazard_rating=round(float(h_rating), 4), vulnerability_rating=round(float(v_rating), 4),
-            exposure_rating=round(float(e_rating), 4), risk_rating=round(float(risk_rating), 4),
-            ml_prediction=ml_val, ml_category=ml_cat
-        )
+        return {
+            "risk_index": round(float(manual_idx), 4), "risk_description": desc,
+            "hazard_rating": round(float(h_rating), 4), "vulnerability_rating": round(float(v_rating), 4),
+            "exposure_rating": round(float(e_rating), 4), "risk_rating": round(float(risk_rating), 4),
+            "ml_prediction": ml_val, "ml_category": ml_cat
+        }
     except Exception as e:
         import traceback
         traceback.print_exc()

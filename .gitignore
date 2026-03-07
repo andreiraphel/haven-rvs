@@ -18,3 +18,5 @@ ml/figures/*.jpg
 # OS
 .DS_Store
 Thumbs.db
+~$*
+*.~*
