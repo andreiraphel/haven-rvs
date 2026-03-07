@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Topbar from "@/components/layout/Topbar";
-import type { Building, HazardIndicators, VulnerabilityIndicators, ExposureIndicators, RiskResult } from "@/types";
+import type { Building, HazardIndicators, VulnerabilityIndicators, ExposureIndicators, RiskResult, RiskLevel } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { calculateAssessmentRisk } from "@/lib/risk-calculator";
 
