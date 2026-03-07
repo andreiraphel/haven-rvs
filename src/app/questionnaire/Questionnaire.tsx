@@ -63,15 +63,11 @@ function SurveySelect({ value, onChange }: { value: number; onChange: (v: number
   );
 }
 
-// Persistent counter for cycling profiles
-let stubCounter = 0;
-
 export default function QuestionnairePage() {
   const router = useRouter();
   const [step, setStep]       = useState<Step>("building");
   const [building, setBuilding] = useState<Partial<Building>>({});
-  // ... rest of state
-
+  
   useEffect(() => {
     async function checkAuth() {
       const { data: { session } } = await getSupabase().auth.getSession();
@@ -112,81 +108,87 @@ export default function QuestionnairePage() {
   function fillStub() {
     setIsStubFilled(true);
     
-    // profile: 0=Low, 1=Moderate, 2=High
-    const profile = stubCounter % 3;
-    stubCounter++;
-
-    const range = profile === 0 ? [1, 2] : profile === 2 ? [2, 3] : [2, 2.5]; 
+    // Choose a random profile every time
+    const profile = Math.floor(Math.random() * 3);
+    const label = ["LOW", "MOD", "HIGH"][profile];
+    
+    // Helper: Pick with variety
     const pick = (opts: any[]) => {
-      if (profile === 0) return opts[0];
-      if (profile === 2) return opts[opts.length - 1];
-      return opts[Math.floor(Math.random() * (opts.length - 1)) + 1];
+      const idx = Math.floor(Math.random() * opts.length);
+      if (profile === 0) return opts[Math.min(idx, 1)];
+      if (profile === 2) return opts[Math.max(idx, opts.length - 2)];
+      return opts[idx];
     };
+
     const randNum = (min: number, max: number) => {
-      if (profile === 0) return min + (max - min) * 0.2;
-      if (profile === 2) return max - (max - min) * 0.1;
-      return min + (max - min) * 0.6;
+      const base = min + Math.random() * (max - min);
+      if (profile === 0) return min + (base - min) * 0.3;
+      if (profile === 2) return max - (max - base) * 0.3;
+      return base;
     };
+
     const randScore = () => {
-      if (profile === 1) return Math.random() > 0.5 ? 3 : 2;
-      return Math.floor(Math.random() * (range[1] - range[0] + 1)) + range[0];
-    }
+      const dice = Math.random();
+      if (profile === 0) return dice > 0.8 ? 2 : 1;
+      if (profile === 2) return dice > 0.8 ? 2 : 3;
+      return Math.floor(Math.random() * 3) + 1;
+    };
 
     const stubBuilding = {
-      name: `${["Safe", "Balanced", "Risk"][profile]} Building ${Math.floor(Math.random() * 1000)}`,
-      unique_code: `${["LOW", "MOD", "HIGH"][profile]}-` + Math.random().toString(36).substring(2, 7).toUpperCase(),
-      year_built: profile === 0 ? 2010 : profile === 1 ? 1950 : 1890,
-      address: profile === 0 ? "456 Safety Lane" : profile === 1 ? "789 Average Rd" : "123 Danger Zone",
-      municipality: "Tagbilaran City",
+      name: `${["Amihan", "Balai", "Casa"][Math.floor(Math.random()*3)]} ${["Heritage", "Legacy", "Grand"][Math.floor(Math.random()*3)]} ${Math.floor(Math.random() * 999)}`,
+      unique_code: `${label}-` + Math.random().toString(36).substring(2, 7).toUpperCase(),
+      year_built: profile === 0 ? 2005 + Math.floor(Math.random()*15) : profile === 1 ? 1950 + Math.floor(Math.random()*40) : 1880 + Math.floor(Math.random()*40),
+      address: `${Math.floor(Math.random()*500)} ${["Rizal", "Mabini", "Luna"][Math.floor(Math.random()*3)]} St.`,
+      municipality: ["Tagbilaran", "Baclayon", "Loboc", "Loon"][Math.floor(Math.random()*4)],
       province: "Bohol",
-      latitude: 9.6412,
-      longitude: 123.8572,
+      latitude: 9.6 + (Math.random() * 0.2),
+      longitude: 123.8 + (Math.random() * 0.2),
       building_type: pick(["Timber Building", "Concrete Building", "Masonry Building"]),
       building_use: "Residential",
-      number_of_floors: profile === 0 ? 1 : profile === 1 ? 2 : 4
+      number_of_floors: profile === 0 ? 1 : profile === 1 ? 2 : 3 + Math.floor(Math.random()*2)
     };
 
     const stubHazard = {
-      earthquake_intensity: profile === 1 ? "VI" : pick(["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]),
-      fault_distance_km: randNum(1, 15),
-      fault_name: "Local Fault",
-      seismic_source_type: randNum(6.0, 8.0),
-      potential_liquefaction: profile === 1 ? "Moderately Susceptible" : pick(["Safe", "Least Susceptible", "Moderately Susceptible", "Highly Susceptible"]),
-      basic_wind_speed_kph: randNum(200, 300),
-      terrain: profile === 1 ? "Minimal Obstruction" : pick(["Numerous Obstruction", "Minimal Obstruction", "Flat Terrain"]),
-      slope_degrees: profile === 1 ? "9-30 degrees" : pick(["1-8 degrees", "9-30 degrees", "31-60 degrees"]),
-      elevation_m: randNum(2, 20),
-      distance_to_water_m: randNum(50, 1000),
+      earthquake_intensity: pick(["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]),
+      fault_distance_km: randNum(0.5, 20),
+      fault_name: "Local Fault Line",
+      seismic_source_type: randNum(5.5, 8.2),
+      potential_liquefaction: pick(["Safe", "Least Susceptible", "Moderately Susceptible", "Highly Susceptible"]),
+      basic_wind_speed_kph: randNum(150, 320),
+      terrain: pick(["Numerous Obstruction", "Minimal Obstruction", "Flat Terrain"]),
+      slope_degrees: pick(["1-8 degrees", "9-30 degrees", "31-60 degrees"]),
+      elevation_m: randNum(1, 50),
+      distance_to_water_m: randNum(10, 1000),
       water_body_name: "Inland Creek",
-      surface_runoff: profile === 1 ? "Grass/Concrete" : pick(["Soil", "Grass", "Concrete"]),
-      base_height: profile === 1 ? "Same Level" : pick(["Base is higher", "Same Level", "Base is lower"]),
-      drainage_system: profile === 1 ? "Open drainage system" : pick(["Closed drainage system", "Open drainage system", "No Drainage System"])
+      surface_runoff: pick(["Soil", "Grass", "Grass/Soil", "Grass/Concrete", "Concrete"]),
+      base_height: pick(["Base is higher", "Same Level", "Base is lower"]),
+      drainage_system: pick(["Closed drainage system", "Open drainage system", "No Drainage System"])
     };
 
     const stubVuln = {
-      building_code: profile === 1 ? "Post-Code (1972-1991)" : pick(["New Code (1992-present)", "Post-Code (1972-1991)", "Pre-Code (before 1972)"]),
-      plan_irregularity: profile === 1 ? "Irregular Shaped" : pick(["Rectangular", "Square", "T- shaped", "Irregular Shaped", "L-shaped"]),
-      vertical_irregularity: profile === 1 ? "1 Vertical Irregularity" : pick(["No vertical irregularity", "1 Vertical Irregularity", "2 Vertical Irregularities"]),
-      building_proximity: profile === 1 ? "6 inches and above" : pick(["No adjacent buildings", "6 inches and above", "below 6 inches"]),
-      number_of_stories: profile === 0 ? 1 : profile === 1 ? 2 : 4,
-      structural_material: profile === 1 ? "Reinforced Concrete" : pick(["Timber Frame", "Reinforced Concrete", "Unreinforced Masonry"]),
-      structural_framing_type: profile === 1 ? "Shearwall" : pick(["Braced", "Shearwall", "Ordinary Frame"]),
-      number_of_bays: profile === 0 ? 6 : profile === 1 ? 3 : 1,
-      column_spacing_m: profile === 0 ? 2.5 : profile === 1 ? 4.5 : 8.0,
-      building_enclosure: profile === 1 ? "Partially Open" : pick(["Enclosed", "Partially Open", "Open"]),
-      wall_material: profile === 1 ? "Masonry" : pick(["Reinforced Concrete", "Masonry", "Unreinforced Masonry"]),
-      flooring_material: profile === 1 ? "Hardwood" : pick(["Concrete", "Hardwood", "Earth Mud"]),
-      maximum_crack: profile === 0 ? "0.2 mm" : profile === 1 ? "2.5 mm" : "25.0 mm",
-      uneven_settlement: profile === 2,
-      beam_column_deformations: profile === 2,
-      finishing_condition: profile === 2,
-      decay_of_structural_member: profile === 2,
-      additional_loads: profile === 2,
-      roof_design: profile === 1 ? "Gable" : pick(["Hip", "Gable", "Monoslope"]),
-      roof_slope: profile === 1 ? "above 45 degrees" : pick(["30 to 45 degrees", "above 45 degrees", "below 30 degrees"]),
-      roofing_material: profile === 1 ? "Galvanized Iron Sheets" : pick(["Tiles", "Galvanized Iron Sheets", "Thatch"]),
-      roof_fastener: profile === 1 ? "Nails" : pick(["Metal Screw", "Nails", "Staples"]),
-      roof_fastener_distance_mm: profile === 0 ? 150 : profile === 1 ? 350 : 800
+      building_code: pick(["New Code (1992-present)", "Post-Code (1972-1991)", "Pre-Code (before 1972)"]),
+      plan_irregularity: pick(["Rectangular", "Square", "T- shaped", "Irregular Shaped", "L-shaped"]),
+      vertical_irregularity: pick(["No vertical irregularity", "1 Vertical Irregularity", "2 Vertical Irregularities"]),
+      building_proximity: pick(["No adjacent buildings", "6 inches and above", "below 6 inches"]),
+      number_of_stories: stubBuilding.number_of_floors,
+      structural_material: stubBuilding.building_type === "Timber Building" ? "Timber Frame" : pick(["Reinforced Concrete", "Unreinforced Masonry"]),
+      structural_framing_type: pick(["Braced", "Special Moment-Resisting Frame", "Shearwall", "Ordinary Frame"]),
+      number_of_bays: profile === 0 ? 5 + Math.floor(Math.random()*3) : profile === 1 ? 3 + Math.floor(Math.random()*2) : 1 + Math.floor(Math.random()*2),
+      column_spacing_m: randNum(2, 8),
+      building_enclosure: pick(["Enclosed", "Partially Open", "Open"]),
+      wall_material: pick(["Reinforced Concrete", "Reinforced Masonry", "Unreinforced Masonry", "Wood", "Bamboo", "Glass", "Masonry"]),
+      flooring_material: pick(["Concrete", "Tiles", "Hardwood", "Bamboo", "Earth Mud"]),
+      maximum_crack: profile === 0 ? "0.1 mm" : profile === 1 ? "2.0 mm" : "12.0 mm",
+      uneven_settlement: profile === 2 ? Math.random() > 0.3 : Math.random() > 0.8,
+      beam_column_deformations: profile === 2 ? Math.random() > 0.3 : Math.random() > 0.8,
+      finishing_condition: profile === 2 ? Math.random() > 0.3 : Math.random() > 0.8,
+      decay_of_structural_member: profile === 2 ? Math.random() > 0.2 : Math.random() > 0.9,
+      additional_loads: profile === 2 ? Math.random() > 0.4 : Math.random() > 0.9,
+      roof_design: pick(["Hip", "Dutch Hip", "Gable", "Cross Hip Roof", "Monoslope"]),
+      roof_slope: pick(["30 to 45 degrees", "above 45 degrees", "below 30 degrees"]),
+      roofing_material: pick(["Tiles", "Concrete", "Galvanized Iron Sheets", "Metals", "Asphalt Shingles", "Wood", "Thatch", "Shingles"]),
+      roof_fastener: pick(["Metal Screw", "Nails", "Staples", "Hazel Spars"]),
+      roof_fastener_distance_mm: randNum(150, 600)
     };
 
     const stubExposure = {
@@ -323,14 +325,14 @@ export default function QuestionnairePage() {
       console.log("🏁 Finalizing Result...");
       const { error: rErr } = await sb.from("risk_results").insert({
         building_id: savedBuilding.id, 
-        risk_index: primaryIndex, // Save ML index as the main index
+        risk_index: primaryIndex, 
         risk_description: finalDesc, 
         hazard_rating: manualResult.hazard_rating,
         vulnerability_rating: manualResult.vulnerability_rating, 
         exposure_rating: manualResult.exposure_rating,
         risk_rating: manualResult.risk_rating, 
         ml_prediction: mlPred,
-        manual_index: manualResult.risk_index, // Store manual index separately for reference
+        manual_index: manualResult.risk_index,
         narrative: aiNarrative, 
         ai_course_of_action: aiCOA,
         assessed_by: user.id,

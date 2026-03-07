@@ -4,10 +4,10 @@ from pydantic import BaseModel
 import pickle
 import numpy as np
 import os
-from xgboost import XGBRegressor
+from xgboost import XGBRegressor, XGBClassifier
 
 # Initialize FastAPI
-app = FastAPI(title="HAVEN-RVS ML Server")
+app = FastAPI(title="HAVEN-RVS Dual-Engine ML Server")
 
 app.add_middleware(
     CORSMiddleware,
@@ -18,13 +18,14 @@ app.add_middleware(
 )
 
 # --- MEMORY OPTIMIZED LOADING ---
-model = None
+model_idx = None # Regressor
+model_clf = None # Classifier
 scaler = None
 le = None
 
 def load_artifacts():
-    global model, scaler, le
-    if model is not None: return
+    global model_idx, model_clf, scaler, le
+    if model_idx is not None: return
     
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     EXPORTS = os.path.join(BASE_DIR, "model_exports")
@@ -32,11 +33,19 @@ def load_artifacts():
         EXPORTS = "model_exports"
 
     try:
+        # Load scaler and label encoder
         scaler = pickle.load(open(os.path.join(EXPORTS, "scaler.pkl"), "rb"))
         le     = pickle.load(open(os.path.join(EXPORTS, "label_encoder.pkl"), "rb"))
-        model = XGBRegressor()
-        model.load_model(os.path.join(EXPORTS, "best_model.json"))
-        print(f"✅ Optimized Model artifacts loaded successfully")
+        
+        # Load Index Regressor
+        model_idx = XGBRegressor()
+        model_idx.load_model(os.path.join(EXPORTS, "best_model.json"))
+        
+        # Load Category Classifier
+        model_clf = XGBClassifier()
+        model_clf.load_model(os.path.join(EXPORTS, "classifier_model.json"))
+        
+        print(f"✅ Dual-Engine Model artifacts loaded successfully")
     except Exception as e:
         print(f"❌ CRITICAL: Failed to load artifacts: {e}")
 
@@ -56,8 +65,9 @@ class PredictResponse(BaseModel):
     exposure_rating: float
     risk_rating: float
     ml_prediction: float
+    ml_category: str # Added field for the direct classification
 
-# --- MAPPINGS FROM SPREADSHEET ---
+# --- MAPPINGS FROM EXCEL ---
 def get_peis_score(v):
     if v in ["I", "II", "III", "IV"]: return 1
     if v in ["V", "VI"]: return 2
@@ -109,7 +119,7 @@ FAST_TYPE_MAP = {"Metal Screw": 1, "Nails": 2, "Staples": 3, "Hazel Spars": 3}
 # --- ROUTES ---
 @app.get("/")
 def home():
-    return {"status": "online", "message": "HAVEN-RVS ML Server is Live"}
+    return {"status": "online", "message": "HAVEN-RVS Dual-Engine Server is Live"}
 
 def encode_inputs(hazard: dict, vulnerability: dict, exposure: dict = None, year_built: int = 1950, isStub: bool = False) -> list[float]:
     h = hazard; v = vulnerability; e = exposure
@@ -150,57 +160,57 @@ def encode_inputs(hazard: dict, vulnerability: dict, exposure: dict = None, year
         FAST_TYPE_MAP.get(v.get("roof_fastener"), 2), f_dist
     ]
 
-def compute_manual_ratings(hazard: dict, vulnerability: dict, exposure: dict = None, year_built: int = 1950, isStub: bool = False):
-    h = hazard; v = vulnerability; e = exposure
-    def_score = 3 if isStub else 2
-    
-    # EXACT SPREADSHEET WEIGHTS
-    a1 = (get_peis_score(h.get("earthquake_intensity")) * 0.224) + (get_fault_score(h.get("fault_distance_km", 10)) * 0.185) + (get_source_score(h.get("seismic_source_type", 7.0)) * 0.364) + (LIQ_MAP.get(h.get("potential_liquefaction"), 2) * 0.227)
-    a2 = (get_wind_score(h.get("basic_wind_speed_kph", 260)) * 0.657) + (TERRAIN_MAP.get(h.get("terrain"), 2) * 0.343)
-    a3 = (SLOPE_MAP.get(h.get("slope_degrees"), 1) * 0.087) + (get_elevation_score(h.get("elevation_m", 12)) * 0.211) + (get_water_dist_score(h.get("distance_to_water_m", 500)) * 0.175) + (RUNOFF_MAP.get(h.get("surface_runoff"), 2) * 0.269) + (BASE_MAP.get(h.get("base_height"), 2) * 0.140) + (DRAIN_MAP.get(h.get("drainage_system"), 3) * 0.118)
-    h_rating = np.mean([a1, a2, a3])
-    
-    if e:
-        b1 = (e.get("b11", def_score)*0.159) + (e.get("b12", def_score)*0.168) + (e.get("b13", def_score)*0.344) + (e.get("b14", def_score)*0.329)
-        b2 = (get_age_score(year_built)*0.401) + (e.get("b22", def_score)*0.125) + (e.get("b23", (3 if isStub else 1))*0.093) + (e.get("b24", def_score)*0.158) + (e.get("b25", def_score)*0.223)
-        b3 = (e.get("b31", def_score)*0.378) + (e.get("b32", def_score)*0.217) + (e.get("b33", def_score)*0.133) + (e.get("b34", def_score)*0.272)
-        b4 = (e.get("b41", def_score)*0.244) + (e.get("b42", def_score)*0.361) + (e.get("b43", def_score)*0.115) + (e.get("b44", def_score)*0.280)
-    else:
-        b1 = (def_score*0.159) + (def_score*0.168) + (def_score*0.344) + (def_score*0.329)
-        b2 = (get_age_score(year_built)*0.401) + (def_score*0.125) + ((3 if isStub else 1)*0.093) + (def_score*0.158) + (def_score*0.223)
-        b3 = (def_score*0.378) + (def_score*0.217) + (def_score*0.133) + (def_score*0.272)
-        b4 = (def_score*0.244) + (def_score*0.361) + (def_score*0.115) + (def_score*0.280)
-    e_rating = np.mean([b1, b2, b3, b4])
-    
-    stories = int(v.get("number_of_stories", 1))
-    bays = int(v.get("number_of_bays", 5)); spacing = float(v.get("column_spacing_m", 2))
-    c1_s = [CODE_MAP.get(v.get("building_code"), 2), PLAN_MAP.get(v.get("plan_irregularity"), 1), VERT_MAP.get(v.get("vertical_irregularity"), 1), PROX_MAP.get(v.get("building_proximity"), 1), 3 if stories >= 3 else stories, MAT_MAP.get(v.get("structural_material"), 2), FRAME_MAP.get(v.get("structural_framing_type"), 3), 1 if bays >= 5 else 2 if bays >= 3 else 3, 1 if spacing < 3 else 2 if spacing <= 5 else 3, ENCL_MAP.get(v.get("building_enclosure"), 1), WALL_MAP.get(v.get("wall_material"), 2), FLOOR_MAP.get(v.get("flooring_material"), 1)]
-    c1 = sum(s * w for s, w in zip(c1_s, [0.092, 0.053, 0.057, 0.063, 0.031, 0.098, 0.051, 0.082, 0.146, 0.113, 0.102, 0.069]))
-    c2 = sum(s * w for s, w in zip([get_crack_score(v.get("maximum_crack")), 3 if v.get("uneven_settlement") else 1, 3 if v.get("beam_column_deformations") else 1, 3 if v.get("finishing_condition") else 1, 3 if v.get("decay_of_structural_member") else 1, 3 if v.get("additional_loads") else 1], [0.158, 0.147, 0.213, 0.124, 0.133, 0.225]))
-    c3 = (ROOF_DESIGN_MAP.get(v.get("roof_design"), 2)*0.344) + (ROOF_SLOPE_MAP.get(v.get("roof_slope"), 1)*0.424) + (ROOF_MAT_MAP.get(v.get("roofing_material"), 2)*0.232)
-    f_score = 1 if float(v.get("roof_fastener_distance_mm", 200)) <= 225 else 2 if float(v.get("roof_fastener_distance_mm", 200)) <= 450 else 3
-    c4 = (FAST_TYPE_MAP.get(v.get("roof_fastener"), 2)*0.632) + (f_score*0.368)
-    v_rating = np.mean([c1, c2, c3, c4])
-    
-    risk_rating = h_rating * e_rating * v_rating
-    manual_idx = (risk_rating / 27) * 10
-    return manual_idx, h_rating, e_rating, v_rating, risk_rating
-
 @app.post("/predict", response_model=PredictResponse)
 def predict(req: PredictRequest):
     try:
         load_artifacts()
-        manual_idx, h_val, e_val, v_val, risk_rating = compute_manual_ratings(req.hazard, req.vulnerability, req.exposure, req.year_built, req.isStub)
-        ml_val = 0.0
-        if model and scaler:
+        
+        # Calculate manual ratings
+        h = req.hazard; v = req.vulnerability; e = req.exposure
+        def_score = 3 if req.isStub else 2
+        a1 = (get_peis_score(h.get("earthquake_intensity")) * 0.224) + (get_fault_score(h.get("fault_distance_km", 10)) * 0.185) + (get_source_score(h.get("seismic_source_type", 7.0)) * 0.364) + (LIQ_MAP.get(h.get("potential_liquefaction"), 2) * 0.227)
+        a2 = (get_wind_score(h.get("basic_wind_speed_kph", 260)) * 0.657) + (TERRAIN_MAP.get(h.get("terrain"), 2) * 0.343)
+        a3 = (SLOPE_MAP.get(h.get("slope_degrees"), 1) * 0.087) + (get_elevation_score(h.get("elevation_m", 12)) * 0.211) + (get_water_dist_score(h.get("distance_to_water_m", 500)) * 0.175) + (RUNOFF_MAP.get(h.get("surface_runoff"), 2) * 0.269) + (BASE_MAP.get(h.get("base_height"), 2) * 0.140) + (DRAIN_MAP.get(h.get("drainage_system"), 3) * 0.118)
+        h_rating = np.mean([a1, a2, a3])
+        if e:
+            b1 = (e.get("b11", def_score)*0.159) + (e.get("b12", def_score)*0.168) + (e.get("b13", def_score)*0.344) + (e.get("b14", def_score)*0.329)
+            b2 = (get_age_score(req.year_built)*0.401) + (e.get("b22", def_score)*0.125) + (e.get("b23", (3 if req.isStub else 1))*0.093) + (e.get("b24", def_score)*0.158) + (e.get("b25", def_score)*0.223)
+            b3 = (e.get("b31", def_score)*0.378) + (e.get("b32", def_score)*0.217) + (e.get("b33", def_score)*0.133) + (e.get("b34", def_score)*0.272)
+            b4 = (e.get("b41", def_score)*0.244) + (e.get("b42", def_score)*0.361) + (e.get("b43", def_score)*0.115) + (e.get("b44", def_score)*0.280)
+        else:
+            b1 = (def_score*0.159) + (def_score*0.168) + (def_score*0.344) + (def_score*0.329)
+            b2 = (get_age_score(req.year_built)*0.401) + (def_score*0.125) + ((3 if req.isStub else 1)*0.093) + (def_score*0.158) + (def_score*0.223)
+            b3 = (def_score*0.378) + (def_score*0.217) + (def_score*0.133) + (def_score*0.272)
+            b4 = (def_score*0.244) + (def_score*0.361) + (def_score*0.115) + (def_score*0.280)
+        e_rating = np.mean([b1, b2, b3, b4])
+        stories = int(v.get("number_of_stories", 1))
+        bays = int(v.get("number_of_bays", 5)); spacing = float(v.get("column_spacing_m", 2))
+        c1_s = [CODE_MAP.get(v.get("building_code"), 2), PLAN_MAP.get(v.get("plan_irregularity"), 1), VERT_MAP.get(v.get("vertical_irregularity"), 1), PROX_MAP.get(v.get("building_proximity"), 1), 3 if stories >= 3 else stories, MAT_MAP.get(v.get("structural_material"), 2), FRAME_MAP.get(v.get("structural_framing_type"), 3), 1 if bays >= 5 else 2 if bays >= 3 else 3, 1 if spacing < 3 else 2 if spacing <= 5 else 3, ENCL_MAP.get(v.get("building_enclosure"), 1), WALL_MAP.get(v.get("wall_material"), 2), FLOOR_MAP.get(v.get("flooring_material"), 1)]
+        c1 = sum(s * w for s, w in zip(c1_s, [0.092, 0.053, 0.057, 0.063, 0.031, 0.098, 0.051, 0.082, 0.146, 0.113, 0.102, 0.069]))
+        c2 = sum(s * w for s, w in zip([get_crack_score(v.get("maximum_crack")), 3 if v.get("uneven_settlement") else 1, 3 if v.get("beam_column_deformations") else 1, 3 if v.get("finishing_condition") else 1, 3 if v.get("decay_of_structural_member") else 1, 3 if v.get("additional_loads") else 1], [0.158, 0.147, 0.213, 0.124, 0.133, 0.225]))
+        c3 = (ROOF_DESIGN_MAP.get(v.get("roof_design"), 2)*0.344) + (ROOF_SLOPE_MAP.get(v.get("roof_slope"), 1)*0.424) + (ROOF_MAT_MAP.get(v.get("roofing_material"), 2)*0.232)
+        f_dist_val = float(v.get("roof_fastener_distance_mm", 200))
+        f_score = 1 if f_dist_val <= 225 else 2 if f_dist_val <= 450 else 3
+        c4 = (FAST_TYPE_MAP.get(v.get("roof_fastener"), 2)*0.632) + (f_score*0.368)
+        v_rating = np.mean([c1, c2, c3, c4])
+        risk_rating = h_rating * e_rating * v_rating
+        manual_idx = (risk_rating / 27) * 10
+
+        # Predict
+        ml_val = 0.0; ml_cat = "UNKNOWN"
+        if model_idx and model_clf and scaler:
             features = encode_inputs(req.hazard, req.vulnerability, req.exposure, req.year_built, req.isStub)
-            ml_val = round(float(model.predict(scaler.transform([features]))[0]), 4)
+            X_scaled = scaler.transform([features])
+            ml_val = round(float(model_idx.predict(X_scaled)[0]), 4)
+            cat_idx = int(model_clf.predict(X_scaled)[0])
+            ml_cat = le.inverse_transform([cat_idx])[0]
+
         desc = "LOW RISK" if manual_idx <= 3.58 else "MODERATE RISK" if manual_idx <= 6.79 else "HIGH RISK"
         return PredictResponse(
             risk_index=round(float(manual_idx), 4), risk_description=desc,
-            hazard_rating=round(float(h_val), 4), vulnerability_rating=round(float(v_val), 4),
-            exposure_rating=round(float(e_val), 4), risk_rating=round(float(risk_rating), 4),
-            ml_prediction=ml_val
+            hazard_rating=round(float(h_rating), 4), vulnerability_rating=round(float(v_rating), 4),
+            exposure_rating=round(float(e_rating), 4), risk_rating=round(float(risk_rating), 4),
+            ml_prediction=ml_val, ml_category=ml_cat
         )
     except Exception as e:
         import traceback
