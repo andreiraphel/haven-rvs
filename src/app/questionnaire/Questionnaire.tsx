@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Topbar from "@/components/layout/Topbar";
 import type { Building, HazardIndicators, VulnerabilityIndicators, ExposureIndicators, RiskResult, RiskLevel } from "@/types";
-import { supabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 import { calculateAssessmentRisk } from "@/lib/risk-calculator";
 
 type Step = "building" | "hazard" | "exposure" | "vulnerability" | "result";
@@ -70,6 +70,18 @@ export default function QuestionnairePage() {
   const router = useRouter();
   const [step, setStep]       = useState<Step>("building");
   const [building, setBuilding] = useState<Partial<Building>>({});
+  // ... rest of state
+
+  useEffect(() => {
+    async function checkAuth() {
+      const { data: { session } } = await getSupabase().auth.getSession();
+      if (!session) {
+        router.replace("/login");
+      }
+    }
+    checkAuth();
+  }, [router]);
+
   const [hazard, setHazard]   = useState<Partial<HazardIndicators>>({});
   const [vuln, setVuln]       = useState<Partial<VulnerabilityIndicators>>({});
   const [exposure, setExposure] = useState<Partial<ExposureIndicators>>({
@@ -104,20 +116,19 @@ export default function QuestionnairePage() {
     const profile = stubCounter % 3;
     stubCounter++;
 
-    const range = profile === 0 ? [1, 2] : profile === 2 ? [2, 3] : [2, 2.5]; // Moderate needs slightly higher than 2.0 avg
+    const range = profile === 0 ? [1, 2] : profile === 2 ? [2, 3] : [2, 2.5]; 
     const pick = (opts: any[]) => {
       if (profile === 0) return opts[0];
       if (profile === 2) return opts[opts.length - 1];
-      // For Moderate, pick middle options or bias towards higher
       return opts[Math.floor(Math.random() * (opts.length - 1)) + 1];
     };
     const randNum = (min: number, max: number) => {
       if (profile === 0) return min + (max - min) * 0.2;
       if (profile === 2) return max - (max - min) * 0.1;
-      return min + (max - min) * 0.6; // Moderate
+      return min + (max - min) * 0.6;
     };
     const randScore = () => {
-      if (profile === 1) return Math.random() > 0.5 ? 3 : 2; // Mixed Agree/Neutral for Moderate
+      if (profile === 1) return Math.random() > 0.5 ? 3 : 2;
       return Math.floor(Math.random() * (range[1] - range[0] + 1)) + range[0];
     }
 
@@ -195,12 +206,16 @@ export default function QuestionnairePage() {
   }
 
   async function computeAndShow() {
+    console.log("🚀 START: Compute Index Pressed");
     setLoading(true); setError(null);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const sb = getSupabase();
+      const { data: { user } } = await sb.auth.getUser();
       if (!user) throw new Error("You must be logged in to submit an assessment.");
+      console.log("👤 User authenticated:", user.id);
 
       // Manual Computation
+      console.log("🔢 Running Manual Computation...");
       const manualResult = calculateAssessmentRisk(
         hazard as HazardIndicators,
         vuln as VulnerabilityIndicators,
@@ -208,8 +223,10 @@ export default function QuestionnairePage() {
         isStubFilled,
         exposure as ExposureIndicators
       );
+      console.log("✅ Manual Result:", manualResult);
 
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await sb.auth.getSession();
+      console.log("💾 Saving Building to Supabase...");
       const buildingRes = await fetch("/api/buildings", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
@@ -217,8 +234,9 @@ export default function QuestionnairePage() {
       });
       if (!buildingRes.ok) throw new Error("Failed to save building");
       const savedBuilding = await buildingRes.json();
+      console.log("✅ Building Saved:", savedBuilding.id);
 
-      await supabase.from("questionnaire_responses").insert({
+      await sb.from("questionnaire_responses").insert({
         building_id: savedBuilding.id, step: "final_submission",
         response: { building, hazard, vulnerability: vuln, exposure }
       });
@@ -229,6 +247,7 @@ export default function QuestionnairePage() {
       const finalExposure = { ...exposure, b21, building_id: savedBuilding.id };
 
       // Fetch ML Prediction
+      console.log("🤖 Calling ML API /api/predict...");
       let mlPred = 0;
       try {
         const mlRes = await fetch("/api/predict", {
@@ -245,21 +264,27 @@ export default function QuestionnairePage() {
         if (mlRes.ok) {
           const mlData = await mlRes.json();
           mlPred = mlData.ml_prediction;
+          console.log("✅ ML Prediction Success:", mlPred);
+        } else {
+          console.error("❌ ML Prediction failed with status:", mlRes.status);
         }
-      } catch (mlErr) { console.error("ML Prediction failed:", mlErr); }
+      } catch (mlErr) { console.error("❌ ML Prediction API call crashed:", mlErr); }
 
       // 3. Save all indicators
+      console.log("📊 Saving Indicators...");
       const [hRes, vRes, eRes] = await Promise.all([
-        supabase.from("hazard_indicators").insert({ ...hazard, building_id: savedBuilding.id }),
-        supabase.from("vulnerability_indicators").insert({ ...vuln, building_id: savedBuilding.id }),
-        supabase.from("exposure_indicators").insert(finalExposure)
+        sb.from("hazard_indicators").insert({ ...hazard, building_id: savedBuilding.id }),
+        sb.from("vulnerability_indicators").insert({ ...vuln, building_id: savedBuilding.id }),
+        sb.from("exposure_indicators").insert(finalExposure)
       ]);
 
       if (hRes.error) throw new Error(`Hazard data failed: ${hRes.error.message}`);
       if (vRes.error) throw new Error(`Vulnerability data failed: ${vRes.error.message}`);
       if (eRes.error) throw new Error(`Exposure data failed: ${eRes.error.message}`);
+      console.log("✅ Indicators Saved");
 
       // 4. Generate AI Narrative & COA
+      console.log("🧠 Calling Gemini AI /api/gemini...");
       let aiNarrative = ""; let aiCOA = "";
       try {
         const geminiRes = await fetch("/api/gemini", {
@@ -277,8 +302,11 @@ export default function QuestionnairePage() {
         if (geminiRes.ok) {
           const gData = await geminiRes.json();
           aiNarrative = gData.narrative; aiCOA = gData.courseOfAction;
+          console.log("✅ Gemini AI Success");
+        } else {
+          console.error("❌ Gemini API failed with status:", geminiRes.status);
         }
-      } catch (gErr) { console.error("Gemini failed:", gErr); }
+      } catch (gErr) { console.error("❌ Gemini AI call crashed:", gErr); }
 
       if (!aiNarrative) aiNarrative = `Assessment for ${building.name}: Index ${manualResult.risk_index.toFixed(2)} (${manualResult.risk_description}).`;
       if (!aiCOA) aiCOA = "1. Structural audit\n2. Connection check\n3. Decay check\n4. Disaster plan";
@@ -292,7 +320,8 @@ export default function QuestionnairePage() {
       else if (primaryIndex <= 6.79) finalDesc = "MODERATE RISK";
       else finalDesc = "HIGH RISK";
 
-      const { error: rErr } = await supabase.from("risk_results").insert({
+      console.log("🏁 Finalizing Result...");
+      const { error: rErr } = await sb.from("risk_results").insert({
         building_id: savedBuilding.id, 
         risk_index: primaryIndex, // Save ML index as the main index
         risk_description: finalDesc, 
@@ -315,12 +344,14 @@ export default function QuestionnairePage() {
         risk_index: primaryIndex,
         risk_description: finalDesc,
         ml_prediction: mlPred, 
-        manual_index: manualResult.risk_index, // Add this line
+        manual_index: manualResult.risk_index,
         narrative: aiNarrative, 
         ai_course_of_action: aiCOA 
       });
+      console.log("🎉 SUCCESS: Moving to result step");
       setStep("result");
     } catch (err: any) {
+      console.error("❌ CRITICAL ERROR in computeAndShow:", err);
       setError(err.message);
     } finally { setLoading(false); }
   }

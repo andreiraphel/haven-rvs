@@ -2,7 +2,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
+import { LogOut } from "lucide-react";
 
 const NAV = [
   { label: "Dashboard",    href: "/dashboard" },
@@ -18,11 +19,12 @@ export default function Topbar() {
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const sb = getSupabase();
+    sb.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = sb.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
 
@@ -30,7 +32,8 @@ export default function Topbar() {
   }, []);
 
   async function handleLogout() {
-    await supabase.auth.signOut();
+    const sb = getSupabase();
+    await sb.auth.signOut();
     router.push("/login");
   }
 
@@ -49,14 +52,14 @@ export default function Topbar() {
 
         {/* Nav */}
         <nav className="flex gap-1 flex-1">
-          {NAV.map(n => (
+          {user && NAV.map(n => (
             <Link
               key={n.href}
               href={n.href}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
                 path === n.href
                   ? "bg-sand text-terracotta font-semibold"
-                  : "text-[var(--ink-lt)] hover:bg-sand hover:text-ink"
+                  : "text-[var(--ink-lt)] hover:bg-sand hover:text-bark"
               }`}
             >
               {n.label}
@@ -66,16 +69,31 @@ export default function Topbar() {
 
         {/* Actions */}
         <div className="flex items-center gap-3">
-          <Link href="/questionnaire" className="btn-primary text-xs px-4 py-2">
-            + New Assessment
-          </Link>
-          <button
-            onClick={handleLogout}
-            className="w-9 h-9 rounded-full bg-gradient-to-br from-terracotta to-sienna text-white text-sm font-bold font-sora flex items-center justify-center hover:opacity-90 transition-opacity"
-            title={`Sign out (${user?.email ?? "User"})`}
-          >
-            {initial}
-          </button>
+          {user ? (
+            <div className="flex items-center gap-3 border-l border-[var(--border)] pl-4 ml-2">
+              <Link href="/questionnaire" className="btn-primary text-xs px-4 py-2 mr-2">
+                + New Assessment
+              </Link>
+              <div className="hidden lg:flex flex-col items-end mr-2">
+                <span className="text-[10px] uppercase font-bold text-[var(--ink-lt)] opacity-60">Evaluator</span>
+                <span className="text-xs font-semibold text-ink">{user.email}</span>
+              </div>
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-terracotta to-sienna text-white text-sm font-bold font-sora flex items-center justify-center shadow-sm">
+                {initial}
+              </div>
+              <button
+                onClick={handleLogout}
+                className="p-2 rounded-lg text-[var(--ink-lt)] hover:text-risk-high hover:bg-red-50 transition-all"
+                title="Sign Out"
+              >
+                <LogOut size={18} />
+              </button>
+            </div>
+          ) : (
+            <Link href="/login" className="btn-primary text-xs px-5 py-2">
+              Sign In
+            </Link>
+          )}
         </div>
       </div>
     </header>

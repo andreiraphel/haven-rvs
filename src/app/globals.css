@@ -21,9 +21,6 @@
   --color-ink: #1A1208;
   --color-ink-lt: #5C4832;
   --color-border: #E0D4C0;
-
-  /* Custom Animations/Transitions (Optional v4 syntax) */
-  --transition-timing-function-standard: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ── Base Styles ── */
