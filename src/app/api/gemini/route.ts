@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
       throw lastError || new Error("All AI models failed to respond.");
     }
 
-    const text = response.text;
+    const text = response.text || "";
     
     // Clean and parse the response
     let cleanText = text.replace(/```json/g, "").replace(/```/g, "").trim();
