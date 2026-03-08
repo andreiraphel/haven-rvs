@@ -42,14 +42,22 @@ def get_risk_label(idx):
     return 2 # HIGH
 
 def generate_data(n):
+    target_per_class = n // 3
     rows = []
-    for _ in range(n):
+    counts = {0: 0, 1: 0, 2: 0}
+    
+    print(f"🎯 Generating balanced dataset ({target_per_class} per class)...")
+    
+    while len(rows) < n:
         r = {}
-        dice = np.random.random()
-        # Ensure balanced training
-        if dice < 0.33: low, high = 1, 2
-        elif dice > 0.66: low, high = 2, 3
-        else: low, high = 1, 3
+        # Adaptive sampling: If we need more HIGH risk, we push the random range higher
+        if counts[2] < target_per_class:
+            low, high = 2, 3
+        elif counts[1] < target_per_class:
+            low, high = 1, 3
+        else:
+            low, high = 1, 2
+            
         for i in range(4): r[f'a1_{i}'] = np.random.randint(low, high+1)
         for i in range(2): r[f'a2_{i}'] = np.random.randint(low, high+1)
         for i in range(6): r[f'a3_{i}'] = np.random.randint(low, high+1)
@@ -61,10 +69,16 @@ def generate_data(n):
         for i in range(6): r[f'c2_{i}'] = np.random.randint(low, high+1)
         for i in range(3): r[f'c3_{i}'] = np.random.randint(low, high+1)
         for i in range(2): r[f'c4_{i}'] = np.random.randint(low, high+1)
+        
         idx = compute_manual_index(r)
-        r['risk_index'] = idx
-        r['risk_label'] = get_risk_label(idx)
-        rows.append(r)
+        label = get_risk_label(idx)
+        
+        if counts[label] < target_per_class:
+            r['risk_index'] = idx
+            r['risk_label'] = label
+            rows.append(r)
+            counts[label] += 1
+            
     return pd.DataFrame(rows)
 
 # 1. DATA PREP
@@ -90,22 +104,78 @@ print('🚀 Training Category Classifier...')
 clf = XGBClassifier(n_estimators=500, max_depth=6, learning_rate=0.05, random_state=RANDOM_SEED, n_jobs=-1)
 clf.fit(X_train_scaled, y_lbl_train)
 
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
+
+# ... (previous code same until Evaluation)
+
 # 4. EVALUATION
 idx_preds = reg.predict(X_test_scaled)
 lbl_preds = clf.predict(X_test_scaled)
 
 print("\n--- PERFORMANCE REPORT ---")
-print(f"Index Prediction (R2): {r2_score(y_idx_test, idx_preds):.4f}")
-print(f"Category Prediction (Accuracy): {accuracy_score(y_lbl_test, lbl_preds):.4f}")
+r2 = r2_score(y_idx_test, idx_preds)
+acc = accuracy_score(y_lbl_test, lbl_preds)
+print(f"XGBoost Index Prediction (R2): {r2:.4f}")
+print(f"XGBoost Category Prediction (Accuracy): {acc:.4f}")
 
-# Confusion Matrix for Categories
+# COMPARISON WITH OTHER MODELS
+print("\n--- MODEL COMPARISON ---")
+lr = LinearRegression().fit(X_train_scaled, y_idx_train)
+lr_preds = lr.predict(X_test_scaled)
+print(f"Linear Regression R2: {r2_score(y_idx_test, lr_preds):.4f}")
+
+rf = RandomForestRegressor(n_estimators=100, random_state=RANDOM_SEED, n_jobs=-1).fit(X_train_scaled, y_idx_train)
+rf_preds = rf.predict(X_test_scaled)
+print(f"Random Forest R2: {r2_score(y_idx_test, rf_preds):.4f}")
+
+# Visualizations
+os.makedirs('ml/figures', exist_ok=True)
+
+# 1. Confusion Matrix
 plt.figure(figsize=(8, 6))
 cm = confusion_matrix(y_lbl_test, lbl_preds)
 sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=['LOW', 'MOD', 'HIGH'], yticklabels=['LOW', 'MOD', 'HIGH'])
-plt.title('Risk Category Confusion Matrix')
+plt.title(f'XGBoost Risk Category Confusion Matrix (Acc: {acc:.2%})')
 plt.ylabel('Actual')
 plt.xlabel('Predicted')
 plt.savefig('ml/figures/confusion_matrix.png')
+plt.close()
+
+# 2. Feature Importance
+plt.figure(figsize=(12, 8))
+feat_importances = pd.Series(reg.feature_importances_, index=X.columns)
+feat_importances.nlargest(20).plot(kind='barh')
+plt.title('Top 20 Features (XGBoost Importance)')
+plt.xlabel('Relative Importance')
+plt.tight_layout()
+plt.savefig('ml/figures/feature_importance.png')
+plt.close()
+
+# 3. Accuracy Plot (XGBoost)
+plt.figure(figsize=(10, 6))
+plt.scatter(y_idx_test, idx_preds, alpha=0.3, color='green')
+plt.plot([y_idx.min(), y_idx.max()], [y_idx.min(), y_idx.max()], 'r--', lw=2)
+plt.title(f'XGBoost: Predicted vs Actual Risk Index (R2: {r2:.4f})')
+plt.xlabel('Actual Index')
+plt.ylabel('Predicted Index')
+plt.savefig('ml/figures/xgboost_accuracy.png')
+plt.close()
+
+# 4. Accuracy Plot (Random Forest)
+plt.figure(figsize=(10, 6))
+plt.scatter(y_idx_test, rf_preds, alpha=0.3, color='blue')
+plt.plot([y_idx.min(), y_idx.max()], [y_idx.min(), y_idx.max()], 'r--', lw=2)
+plt.title(f'Random Forest: Predicted vs Actual (R2: {r2_score(y_idx_test, rf_preds):.4f})')
+plt.savefig('ml/figures/random_forest_accuracy.png')
+plt.close()
+
+# 5. Accuracy Plot (Linear Regression)
+plt.figure(figsize=(10, 6))
+plt.scatter(y_idx_test, lr_preds, alpha=0.3, color='gray')
+plt.plot([y_idx.min(), y_idx.max()], [y_idx.min(), y_idx.max()], 'r--', lw=2)
+plt.title(f'Linear Regression: Predicted vs Actual (R2: {r2_score(y_idx_test, lr_preds):.4f})')
+plt.savefig('ml/figures/linear_regression_accuracy.png')
 plt.close()
 
 # 5. EXPORT
