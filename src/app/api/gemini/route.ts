@@ -51,14 +51,18 @@ export async function POST(req: NextRequest) {
 
     for (const modelName of models) {
       try {
+        console.log(`Attempting Gemini model: ${modelName}...`);
         response = await ai.models.generateContent({
           model: modelName,
           contents: prompt,
         });
-        if (response) break; // Success!
+        if (response && response.text) {
+          console.log(`✅ Success with ${modelName}`);
+          break; 
+        }
       } catch (err: any) {
         lastError = err;
-        console.warn(`${modelName} failed (status: ${err.status}). Trying next...`);
+        console.warn(`⚠️ ${modelName} failed: ${err.message || err.status}`);
         // Small delay before trying next model to allow 429s to breathe
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
@@ -80,7 +84,7 @@ export async function POST(req: NextRequest) {
         courseOfAction: parsed.courseOfAction || "1. Perform structural audit." 
       });
     } catch (e) {
-      console.error("Gemini 3 Implementation Parse Error:", text);
+      console.error("Gemini Parse Error:", text);
       return NextResponse.json({ 
         narrative: text.substring(0, 500), 
         courseOfAction: "1. **Parsing Error** AI output format was unexpected." 
