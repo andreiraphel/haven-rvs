@@ -24,9 +24,7 @@ export default function AboutPage() {
                 heritage and ancestral houses in the Philippines.
               </p>
               <p>
-                The system determines a numerical <strong className="text-ink">Risk Index</strong> on a 0–10 scale
-                for each structure, provides a risk description (Low / Moderate / High), and generates a prioritized
-                course of action powered by Google Gemini AI.
+                The system is uniquely powered by a dual-AI architecture. A <strong className="text-ink">Custom-Trained Machine Learning Model</strong> (XGBoost) calculates the numerical Risk Index, while <strong className="text-ink">Google Gemini AI</strong> generates contextualized prioritization narratives and course-of-action reports for each structure.
               </p>
               <p>
                 Hazard indicators covering earthquake intensity, fault proximity, wind speed, slope, elevation, and
@@ -39,16 +37,16 @@ export default function AboutPage() {
               </p>
             </div>
 
-            <div className="mt-8 grid grid-cols-2 gap-4">
+            <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[
                 { icon: "🔬", title: "Research-Grade", desc: "Methodology based on PHIVOLCS, NSCP 2015, and engineering best practices" },
-                { icon: "🤖", title: "AI-Powered", desc: "Gemini AI generates contextual course-of-action narratives per building" },
+                { icon: "🤖", title: "Dual-AI Powered", desc: "Custom-trained model for risk scoring & Gemini for course-of-action generation" },
                 { icon: "📊", title: "Risk Analytics", desc: "Hazard × Vulnerability × Exposure model with 0–10 risk index" },
                 { icon: "🗺️", title: "Map Visualization", desc: "Geospatial view of risk distribution with filterable risk levels" },
               ].map(f => (
-                <div key={f.title} className="bg-sand rounded-xl p-4">
-                  <div className="text-2xl mb-2">{f.icon}</div>
-                  <div className="font-sora font-semibold text-sm text-ink mb-1">{f.title}</div>
+                <div key={f.title} className="bg-sand rounded-xl p-5 border border-transparent hover:border-clay/20 transition-colors">
+                  <div className="text-3xl mb-3">{f.icon}</div>
+                  <div className="font-sora font-bold text-sm text-ink mb-1">{f.title}</div>
                   <div className="text-xs text-[var(--ink-lt)] leading-relaxed">{f.desc}</div>
                 </div>
               ))}
@@ -64,7 +62,7 @@ export default function AboutPage() {
               <div className="space-y-4">
                 {[
                   { initials: "JG", name: "Engr. Joshua M. Gumia", role: "Author & Researcher", institution: "Universiti Teknologi PETRONAS, Malaysia" },
-                  { initials: "BM", name: "AP IR Dr. Bashar S. Mohammed", role: "Thesis Supervisor", institution: "Universiti Teknologi PETRONAS" },
+                  { initials: "BM", name: "AP IR Dr. Bashar S. Mohammed", role: "Thesis Supervisor", institution: "Universiti Teknologi PETRONAS, Malaysia" },
                 ].map(p => (
                   <div key={p.initials} className="flex gap-3">
                     <div className="w-11 h-11 rounded-full bg-gradient-to-br from-terracotta to-sienna text-white font-bold font-sora flex items-center justify-center flex-shrink-0">
@@ -85,7 +83,7 @@ export default function AboutPage() {
                 Tech Stack
               </h3>
               <div className="flex flex-wrap gap-2">
-                {["Next.js 14", "TypeScript", "Tailwind CSS", "FastAPI", "Supabase", "Gemini AI", "Python ML"].map(t => (
+                {["Next.js 14", "TypeScript", "Tailwind CSS", "FastAPI", "Supabase", "Gemini AI", "Python ML", "Google Cloud"].map(t => (
                   <span key={t} className="bg-sand border border-[var(--border)] text-[var(--ink-lt)] text-xs px-2.5 py-1 rounded-full">
                     {t}
                   </span>

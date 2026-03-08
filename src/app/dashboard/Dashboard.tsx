@@ -72,7 +72,7 @@ export default function DashboardPage() {
   return (
     <>
       <Topbar />
-      <main className="max-w-[1400px] mx-auto px-8 py-8">
+      <main className="max-w-[1400px] mx-auto px-4 md:px-8 py-8">
         {/* Header */}
         <div className="mb-7">
           <h2 className="font-sora font-bold text-2xl text-ink">Dashboard</h2>
@@ -80,17 +80,17 @@ export default function DashboardPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <StatCard icon="🏛️" label="Total Buildings"       value={stats.total} color="default" />
           <StatCard icon="✅" label="Low Risk Buildings"    value={stats.low}   color="low" />
           <StatCard icon="⚠️" label="Moderate Risk"         value={stats.mod}   color="mod" />
           <StatCard icon="🚨" label="High Risk Buildings"   value={stats.high}  color="high" />
         </div>
 
-        {/* Table */}
-        <div className="flex items-center justify-between mb-4">
+        {/* Table Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <h3 className="section-title">Recent Evaluations</h3>
-          <Link href="/questionnaire" className="btn-primary text-xs px-4 py-2">+ New Assessment</Link>
+          <Link href="/questionnaire" className="btn-primary text-xs px-4 py-2.5 w-full sm:w-auto">+ New Assessment</Link>
         </div>
         
         {loading ? (
@@ -109,8 +109,8 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="card overflow-hidden">
-              <table className="w-full border-collapse">
+            <div className="card overflow-x-auto">
+              <table className="w-full border-collapse min-w-[800px]">
                 <thead>
                   <tr className="bg-sand border-b border-[var(--border)]">
                     {["Building", "Code", "Location", "Risk Index", "Risk Level"].map(h => (
@@ -125,13 +125,13 @@ export default function DashboardPage() {
                       onClick={() => setSelected(a)}
                       className="border-b border-[var(--border)] last:border-0 hover:bg-sand cursor-pointer transition-colors"
                     >
-                      <td className="px-5 py-4 font-semibold text-ink text-sm">{a.building.name}</td>
+                      <td className="px-5 py-4 font-semibold text-ink text-sm max-w-[200px] truncate">{a.building.name}</td>
                       <td className="px-5 py-4">
                         <span className="bg-sand border border-[var(--border)] text-[var(--ink-lt)] text-xs font-mono px-2 py-1 rounded">
                           {a.building.unique_code}
                         </span>
                       </td>
-                      <td className="px-5 py-4 text-sm text-[var(--ink-lt)]">{a.building.address}</td>
+                      <td className="px-5 py-4 text-sm text-[var(--ink-lt)] max-w-[250px] truncate">{a.building.address}</td>
                       <td className="px-5 py-4">
                         <span className={`font-sora font-bold text-base ${
                           a.result.risk_description === "LOW RISK" ? "text-[var(--risk-low)]" :
@@ -147,17 +147,17 @@ export default function DashboardPage() {
             </div>
 
             {totalPages > 1 && (
-              <div className="flex items-center justify-between px-2 py-4">
-                <p className="text-xs text-[var(--ink-lt)] font-medium">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-2 py-4">
+                <p className="text-xs text-[var(--ink-lt)] font-medium text-center sm:text-left">
                   Showing <span className="text-ink">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to <span className="text-ink">{Math.min(currentPage * ITEMS_PER_PAGE, assessments.length)}</span> of <span className="text-ink">{assessments.length}</span> assessments
                 </p>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap justify-center gap-2">
                   <button
                     onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                     disabled={currentPage === 1}
                     className="btn-secondary py-1.5 px-3 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Previous
+                    Prev
                   </button>
                   {[...Array(totalPages)].map((_, i) => (
                     <button

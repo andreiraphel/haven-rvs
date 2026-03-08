@@ -364,38 +364,41 @@ export default function QuestionnairePage() {
   return (
     <>
       <Topbar />
-      <main className="max-w-3xl mx-auto px-6 py-8">
-        <div className="mb-7 flex justify-between items-start">
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
+        <div className="mb-7 flex flex-col sm:flex-row justify-between items-start gap-4">
           <div>
             <h2 className="font-sora font-bold text-2xl text-ink">New Assessment</h2>
             <p className="text-[var(--ink-lt)] text-sm mt-1">Fill in all sections based on structural audit reference.</p>
           </div>
-          <button onClick={fillStub} className="btn-secondary text-[10px] uppercase tracking-widest px-3 py-1.5 shadow-sm">⚡ Fill Test Data</button>
+          <button onClick={fillStub} className="btn-secondary text-[10px] uppercase tracking-widest px-4 py-2 w-full sm:w-auto shadow-sm">⚡ Fill Test Data</button>
         </div>
 
-        <div className="flex items-center mb-8">
-          {STEPS.map((s, i) => (
-            <div key={s.key} className="flex items-center flex-1 last:flex-none">
-              <div className="flex flex-col items-center cursor-pointer" onClick={() => i <= stepIdx && setStep(s.key)}>
-                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-base transition-colors ${i < stepIdx  ? "bg-terracotta text-white" : i === stepIdx ? "bg-bark text-white" : "bg-[var(--border)] text-[var(--ink-lt)]"}`}>{i < stepIdx ? "✓" : s.icon}</div>
-                <span className={`text-xs mt-1.5 font-medium ${i === stepIdx ? "text-ink" : "text-[var(--ink-lt)]"}`}>{s.label}</span>
+        {/* Step Navigation - Scrollable on mobile */}
+        <div className="overflow-x-auto pb-4 mb-4 -mx-4 px-4 scrollbar-hide">
+          <div className="flex items-center min-w-[600px]">
+            {STEPS.map((s, i) => (
+              <div key={s.key} className="flex items-center flex-1 last:flex-none">
+                <div className="flex flex-col items-center cursor-pointer min-w-[80px]" onClick={() => i <= stepIdx && setStep(s.key)}>
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center text-base transition-colors ${i < stepIdx  ? "bg-terracotta text-white" : i === stepIdx ? "bg-bark text-white" : "bg-[var(--border)] text-[var(--ink-lt)]"}`}>{i < stepIdx ? "✓" : s.icon}</div>
+                  <span className={`text-[10px] mt-1.5 font-bold uppercase tracking-tight ${i === stepIdx ? "text-ink" : "text-[var(--ink-lt)]"}`}>{s.label}</span>
+                </div>
+                {i < STEPS.length - 1 && <div className={`h-0.5 flex-1 mx-2 mt-[-18px] ${i < stepIdx ? "bg-terracotta" : "bg-[var(--border)]"}`} />}
               </div>
-              {i < STEPS.length - 1 && <div className={`h-0.5 flex-1 mx-2 mt-[-16px] ${i < stepIdx ? "bg-terracotta" : "bg-[var(--border)]"}`} />}
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
         {error && <div className="mb-5 rounded-lg border border-red-300 bg-red-50 px-5 py-4 text-sm text-red-700">⚠️ {error}</div>}
 
-        <div className="card p-8">
+        <div className="card p-5 sm:p-8">
           {step === "building" && (
             <div className="space-y-5">
               <h3 className="font-sora font-bold text-lg text-ink">Building Information</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2"><label className="label-sm block mb-2">Building Name *</label><input className="input-field" value={building.name ?? ""} onChange={e => setB("name", e.target.value)} /></div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2"><label className="label-sm block mb-2">Building Name *</label><input className="input-field" value={building.name ?? ""} onChange={e => setB("name", e.target.value)} /></div>
                 <div><label className="label-sm block mb-2">Unique Code *</label><input className="input-field" value={building.unique_code ?? ""} onChange={e => setB("unique_code", e.target.value)} /></div>
                 <div><label className="label-sm block mb-2">Year Built</label><input className="input-field" value={numInputs.year_built ?? building.year_built ?? ""} onChange={e => handleNum("year_built", e.target.value, setB)} /></div>
-                <div className="col-span-2"><label className="label-sm block mb-2">Address</label><input className="input-field" value={building.address ?? ""} onChange={e => setB("address", e.target.value)} /></div>
+                <div className="sm:col-span-2"><label className="label-sm block mb-2">Address</label><input className="input-field" value={building.address ?? ""} onChange={e => setB("address", e.target.value)} /></div>
                 <div><label className="label-sm block mb-2">Municipality</label><input className="input-field" value={building.municipality ?? ""} onChange={e => setB("municipality", e.target.value)} /></div>
                 <div><label className="label-sm block mb-2">Province</label><input className="input-field" value={building.province ?? ""} onChange={e => setB("province", e.target.value)} /></div>
                 <div><label className="label-sm block mb-2">Latitude</label><input className="input-field" value={numInputs.latitude ?? building.latitude ?? ""} onChange={e => handleNum("latitude", e.target.value, setB)} /></div>
@@ -404,7 +407,7 @@ export default function QuestionnairePage() {
                 <div><label className="label-sm block mb-2">Building Use</label><select className="input-field" value={building.building_use ?? ""} onChange={e => setB("building_use", e.target.value)}><option value="">Select…</option><option>Residential</option><option>Commercial</option><option>Mixed Use</option></select></div>
                 <div><label className="label-sm block mb-2">Floors</label><input className="input-field" value={numInputs.number_of_floors ?? building.number_of_floors ?? ""} onChange={e => handleNum("number_of_floors", e.target.value, setB)} /></div>
               </div>
-              <div className="flex justify-end pt-2"><button className="btn-primary" onClick={() => setStep("hazard")}>Next: Hazard →</button></div>
+              <div className="flex justify-end pt-2"><button className="btn-primary w-full sm:w-auto" onClick={() => setStep("hazard")}>Next: Hazard →</button></div>
             </div>
           )}
 

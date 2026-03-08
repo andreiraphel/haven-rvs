@@ -165,16 +165,16 @@ export default function MapPage() {
   return (
     <>
       <Topbar />
-      <main className="max-w-[1400px] mx-auto px-8 py-8">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-8 py-8">
         {/* Header Section */}
-        <div className="mb-7 flex justify-between items-end">
+        <div className="mb-7 flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4">
           <div>
             <h2 className="font-sora font-bold text-2xl text-ink">Map View</h2>
             <p className="text-ink-lt text-sm mt-1">
               Geographic distribution of evaluated heritage structures in Bohol
             </p>
           </div>
-          <div className="text-xs text-ink-lt font-semibold bg-white px-4 py-1.5 rounded-full border border-border shadow-sm">
+          <div className="text-[10px] sm:text-xs text-ink-lt font-bold bg-white px-4 py-1.5 rounded-full border border-border shadow-sm uppercase tracking-widest w-fit">
             {visible.length} BUILDINGS SYNCED
           </div>
         </div>
@@ -182,40 +182,42 @@ export default function MapPage() {
         {/* Map Container Card */}
         <div className="card overflow-hidden border border-border bg-white shadow-lg">
           {/* Controls/Filters */}
-          <div className="px-6 py-4 border-b border-border flex items-center gap-3 bg-sand/30">
+          <div className="px-4 sm:px-6 py-4 border-b border-border flex flex-col sm:flex-row sm:items-center gap-3 bg-sand/30">
             <span className="label-sm">Filter by Risk:</span>
-            {(["LOW RISK", "MODERATE RISK", "HIGH RISK"] as RiskLevel[]).map((level) => {
-              const isActive = filters[level];
-              return (
-                <button
-                  key={level}
-                  onClick={() => setFilters((f) => ({ ...f, [level]: !f[level] }))}
-                  className={`px-4 py-1.5 rounded-full text-xs font-bold border transition-all duration-200 cursor-pointer flex items-center gap-2 ${
-                    isActive
-                      ? "bg-white text-ink border-clay shadow-sm"
-                      : "bg-gray-50 text-gray-400 border-transparent grayscale"
-                  }`}
-                >
-                  <span 
-                    className="w-2 h-2 rounded-full" 
-                    style={{ background: PIN_COLORS[level] }} 
-                  />
-                  {level}
-                </button>
-              );
-            })}
+            <div className="flex flex-wrap gap-2">
+              {(["LOW RISK", "MODERATE RISK", "HIGH RISK"] as RiskLevel[]).map((level) => {
+                const isActive = filters[level];
+                return (
+                  <button
+                    key={level}
+                    onClick={() => setFilters((f) => ({ ...f, [level]: !f[level] }))}
+                    className={`px-3.5 py-1.5 rounded-full text-[10px] font-bold border transition-all duration-200 cursor-pointer flex items-center gap-2 ${
+                      isActive
+                        ? "bg-white text-ink border-clay shadow-sm"
+                        : "bg-gray-50 text-gray-400 border-transparent grayscale"
+                    }`}
+                  >
+                    <span 
+                      className="w-1.5 h-1.5 rounded-full" 
+                      style={{ background: PIN_COLORS[level] }} 
+                    />
+                    {level}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Actual Map */}
           <div 
             ref={mapRef} 
-            className="h-[650px] w-full bg-[#f8f5f0]" 
+            className="h-[450px] sm:h-[650px] w-full bg-[#f8f5f0]" 
           />
         </div>
 
         {/* Floating Quick-Tip */}
-        <div className="mt-4 flex items-center gap-2 text-xs text-ink-lt italic justify-center">
-          <span>💡 Tip: Hold <kbd className="bg-white border rounded px-1 not-italic shadow-sm">Shift</kbd> + click & drag to tilt or rotate the view.</span>
+        <div className="mt-4 flex flex-col sm:flex-row items-center gap-2 text-[10px] sm:text-xs text-ink-lt italic justify-center text-center">
+          <span>ΓÖí Tip: Hold <kbd className="bg-white border rounded px-1 not-italic shadow-sm">Shift</kbd> + click & drag to tilt or rotate the view.</span>
         </div>
       </main>
     </>
