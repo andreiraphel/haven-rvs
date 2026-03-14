@@ -394,10 +394,15 @@ export default function QuestionnairePage() {
         let hRes, vRes, eRes;
 
         if (isEditing) {
+          // Remove unique IDs and timestamps before updating to prevent Supabase errors
+          const { id: hId, created_at: hCat, building_id: hbId, ...cleanHazard } = hazard as any;
+          const { id: vId, created_at: vCat, building_id: vbId, ...cleanVuln } = vuln as any;
+          const { id: eId, created_at: eCat, building_id: ebId, ...cleanExposure } = finalExposure as any;
+
           [hRes, vRes, eRes] = await Promise.all([
-            sb.from("hazard_indicators").update({ ...hazard }).eq("building_id", activeBuildingId),
-            sb.from("vulnerability_indicators").update({ ...vuln }).eq("building_id", activeBuildingId),
-            sb.from("exposure_indicators").update(finalExposure).eq("building_id", activeBuildingId)
+            sb.from("hazard_indicators").update(cleanHazard).eq("building_id", activeBuildingId),
+            sb.from("vulnerability_indicators").update(cleanVuln).eq("building_id", activeBuildingId),
+            sb.from("exposure_indicators").update(cleanExposure).eq("building_id", activeBuildingId)
           ]);
         } else {
           [hRes, vRes, eRes] = await Promise.all([
