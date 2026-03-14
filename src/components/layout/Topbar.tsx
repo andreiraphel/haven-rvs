@@ -115,7 +115,7 @@ export default function Topbar() {
 
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
-        <div className="lg:hidden absolute top-16 left-0 w-full bg-white border-b border-[var(--border)] shadow-xl animate-fade-in z-40 max-h-[calc(100vh-4rem)] overflow-y-auto">
+        <div className="lg:hidden absolute top-16 left-0 w-full bg-white border-b border-[var(--border)] shadow-xl z-40 max-h-[calc(100vh-4rem)] overflow-y-auto">
           <div className="p-4 space-y-4">
             {user && (
               <div className="flex items-center gap-3 p-3 bg-sand rounded-xl mb-4">

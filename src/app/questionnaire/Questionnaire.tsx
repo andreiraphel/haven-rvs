@@ -315,7 +315,10 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
       try {
         const sb = getSupabase();
         const { data: { user } } = await sb.auth.getUser();
-        if (!user) throw new Error("You must be logged in to submit an assessment.");
+        if (!user) {
+          router.replace("/login");
+          return;
+        }
         console.log("👤 User authenticated:", user.id);
 
         // Manual Computation
@@ -619,11 +622,11 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
                 <QField label="A1.1 PHIVOLCS EARTHQUAKE INTENSITY SCALE (PEIS)" sub="Low (Intensity IV and below) ; Moderate (Intensity V to Intensity VI) ; High (Intensity VII and above)"><QualitativeSelect value={hazard.earthquake_intensity ?? ""} options={["I","II","III","IV","V","VI","VII","VIII","IX","X"]} onChange={v => setH("earthquake_intensity",v)} /></QField>
                 <QField label="A1.2 Fault Distance (km)" sub="Low(>10) ; Mod(5-10) ; High(<5)"><input className="input-field" value={numInputs.fault_distance_km ?? hazard.fault_distance_km ?? ""} onChange={e => handleNum("fault_distance_km", e.target.value, setH)} /></QField>
                 <QField label="A1.3 Source (Mw)" sub="Low(<6.5) ; Mod(6.5-7) ; High(7-8.4)"><input className="input-field" value={numInputs.seismic_source_type ?? hazard.seismic_source_type ?? ""} onChange={e => handleNum("seismic_source_type", e.target.value, setH)} /></QField>
-                <QField label="A1.4 Liquefaction" sub="Low(Safe) ; Mod(Moderate) ; High(Highly)"><QualitativeSelect value={hazard.potential_liquefaction ?? ""} options={["Safe","Least Susceptible","Moderately Susceptible","Highly Susceptible"]} onChange={v => setH("potential_liquefaction",v)} /></QField>
+                <QField label="A1.4 Liquefaction" sub="Low(Low Susceptibility) ; Mod(Moderate Susceptibility) ; High(Highly Susceptibility)"><QualitativeSelect value={hazard.potential_liquefaction ?? ""} options={["Safe","Least Susceptible","Moderately Susceptible","Highly Susceptible"]} onChange={v => setH("potential_liquefaction",v)} /></QField>
               </Section>
               <Section title="A2 — Wind">
                 <QField label="A2.1 Wind Speed (kph)" sub="Low(<=225) ; Mod(226-279) ; High(>=280)"><input className="input-field" value={numInputs.basic_wind_speed_kph ?? hazard.basic_wind_speed_kph ?? ""} onChange={e => handleNum("basic_wind_speed_kph", e.target.value, setH)} /></QField>
-                <QField label="A2.2 Vicinity" sub="Low(Numerous) ; Mod(Minimal) ; High(Flat)"><QualitativeSelect value={hazard.terrain ?? ""} options={["Numerous Obstruction","Minimal Obstruction","Flat Terrain"]} onChange={v => setH("terrain",v)} /></QField>
+                <QField label="A2.2 Vicinity" sub="Low(Urban, Numerous Obstruction) ; Mod(Open, Minimum Obstruction) ; High(Flat Terrain, Unobstructed)"><QualitativeSelect value={hazard.terrain ?? ""} options={["Numerous Obstruction","Minimal Obstruction","Flat Terrain"]} onChange={v => setH("terrain",v)} /></QField>
               </Section>
               <Section title="A3 — Flood/Geo">
                 <QField label="A3.1 Slope" sub="Low(1-8°) ; Mod(9-30°) ; High(>30°)"><QualitativeSelect value={hazard.slope_degrees ?? ""} options={["1-8 degrees","9-30 degrees","31-60 degrees","above 60 degrees"]} onChange={v => setH("slope_degrees",v)} /></QField>
@@ -631,7 +634,7 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
                 <QField label="A3.3 Dist. to Water (m)" sub="Low(>500) ; Mod(200-500) ; High(<200)"><input className="input-field" value={numInputs.distance_to_water_m ?? hazard.distance_to_water_m ?? ""} onChange={e => handleNum("distance_to_water_m", e.target.value, setH)} /></QField>
                 <QField label="A3.4 Surface" sub="Low(Lawn/Grass) ; Mod(Clay) ; High(Concrete/Asphalt/Brick)"><QualitativeSelect multiple value={hazard.surface_runoff ?? []} options={["Lawn","Grass","Clay","Concrete", "Asphalt", "Brick"]} onChange={v => setH("surface_runoff", v)} /></QField>
                 <QField label="A3.5 Base Height" sub="Low(Higher) ; Mod(Same) ; High(Lower)"><QualitativeSelect value={hazard.base_height ?? ""} options={["Base is higher","Same Level","Base is lower"]} onChange={v => setH("base_height",v)} /></QField>
-                <QField label="A3.6 Drainage" sub="Low(Maint.) ; Mod(Seldom) ; High(No)"><QualitativeSelect value={hazard.drainage_system ?? ""} options={["Closed drainage system","Open drainage system","No Drainage System"]} onChange={v => setH("drainage_system",v)} /></QField>
+                <QField label="A3.6 Drainage" sub="Low(Regular Maintenance) ; Mod(Seldom to No Maintenance) ; High(No Drainage)"><QualitativeSelect value={hazard.drainage_system ?? ""} options={["Closed drainage system","Open drainage system","No Drainage System"]} onChange={v => setH("drainage_system",v)} /></QField>
               </Section>
               <div className="flex justify-between pt-2"><button className="btn-secondary" onClick={() => setStep("building")}>← Back</button><button className="btn-primary" onClick={() => setStep("exposure")}>Next: Values →</button></div>
             </div>
@@ -686,15 +689,15 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
                 <QField label="C1.1 Code Year Built" sub="Low (1992+) ; Moderate (1972-1991) ; High (Pre-1972)"><QualitativeSelect value={vuln.building_code ?? ""} options={["New Code (1992-present)","Post-Code (1972-1991)","Pre-Code (before 1972)"]} onChange={v => setV("building_code",v)} /></QField>
                 <QField label="C1.2 Plan Irregularity" sub="Low (Regular) ; Moderate (Symmetric T,U,C) ; High (L-shaped)"><QualitativeSelect multiple value={vuln.plan_irregularity ?? []} options={["Rectangular", "Square", "T- shaped", "Irregular Shaped", "L-shaped"]} onChange={v => setV("plan_irregularity",v)} /></QField>
                 <QField label="C1.3 Vertical Irregularity" sub="Low (None) ; Moderate (1) ; High (2+)"><QualitativeSelect value={vuln.vertical_irregularity ?? ""} options={["No vertical irregularity", "1 Vertical Irregularity", "2 Vertical Irregularities"]} onChange={v => setV("vertical_irregularity",v)} /></QField>
-                <QField label="C1.4 Proximity / Pounding" sub="Low (No adjacent) ; Moderate (>6 inches) ; High (<6 inches)"><QualitativeSelect value={vuln.building_proximity ?? ""} options={["No adjacent buildings", "6 inches and above", "below 6 inches"]} onChange={v => setV("building_proximity",v)} /></QField>
+                <QField label="C1.4 Proximity / Pounding" sub="Low (No adjacent building) ; Moderate (Adequate-more than 6 inches) ; High (Not adequate- less than 6 inches)"><QualitativeSelect value={vuln.building_proximity ?? ""} options={["No adjacent buildings", "6 inches and above", "below 6 inches"]} onChange={v => setV("building_proximity",v)} /></QField>
                 <QField label="C1.5 Number of Storeys" sub="Low (1) ; Moderate (2) ; High (3+)"><input className="input-field" value={numInputs.number_of_stories ?? vuln.number_of_stories ?? ""} onChange={e => handleNum("number_of_stories", e.target.value, setV)} /></QField>
-                <QField label="C1.6 System Material" sub="Low (Timber/LS) ; Moderate (RC/Steel) ; High (URM)"><QualitativeSelect multiple value={vuln.structural_material ?? []} options={["Timber Frame","Light Steel Frame","Reinforced Concrete","Steel","Unreinforced Masonry"]} onChange={v => setV("structural_material",v)} /></QField>
+                <QField label="C1.6 System Material" sub="Low (Timber Frame and Light Steel Frame) ; Moderate (Reinforced Concrete and Steel) ; High (Unreinforced Masonry)"><QualitativeSelect multiple value={vuln.structural_material ?? []} options={["Timber Frame","Light Steel Frame","Reinforced Concrete","Steel","Unreinforced Masonry"]} onChange={v => setV("structural_material",v)} /></QField>
                 <QField label="C1.7 Number of Bays" sub="Low (5+) ; Moderate (3-4) ; High (<3)"><input className="input-field" value={numInputs.number_of_bays ?? vuln.number_of_bays ?? ""} onChange={e => handleNum("number_of_bays", e.target.value, setV)} /></QField>
                 <QField label="C1.8 Column Spacing (m)" sub="Low (<3m) ; Moderate (3-5m) ; High (>5m)"><input className="input-field" value={numInputs.column_spacing_m ?? vuln.column_spacing_m ?? ""} onChange={e => handleNum("column_spacing_m", e.target.value, setV)} /></QField>
-                <QField label="C1.9 Building Enclosure" sub="Low (Enclosed) ; Moderate (Partial) ; High (Open)"><QualitativeSelect multiple value={vuln.building_enclosure ?? []} options={["Enclosed", "Partially Open", "Open"]} onChange={v => setV("building_enclosure",v)} /></QField>
-                <QField label="C1.10 Wall Material" sub="Low (RC) ; Moderate (RM) ; High (URM/Wood/Glass)"><QualitativeSelect multiple value={vuln.wall_material ?? []} options={["Reinforced Concrete", "Reinforced Masonry", "Unreinforced Masonry", "Wood", "Bamboo", "Glass", "Masonry"]} onChange={v => setV("wall_material",v)} /></QField>
-                <QField label="C1.11 Framing Type" sub="Low (Braced/SMRF) ; Moderate (Shearwall) ; High (Ordinary)"><QualitativeSelect multiple value={vuln.structural_framing_type ?? []} options={["Braced","Special Moment-Resisting Frame","Shearwall","Ordinary Frame"]} onChange={v => setV("structural_framing_type",v)} /></QField>
-                <QField label="C1.12 Flooring Material" sub="Low (Tiles/RC) ; Moderate (Hardwood/Bamboo) ; High (Mud)"><QualitativeSelect multiple value={vuln.flooring_material ?? []} options={["Concrete", "Tiles", "Hardwood", "Bamboo", "Earth Mud"]} onChange={v => setV("flooring_material",v)} /></QField>
+                <QField label="C1.9 Building Enclosure" sub="Low (Enclosed) ; Moderate (Partially Open) ; High (Open)"><QualitativeSelect multiple value={vuln.building_enclosure ?? []} options={["Enclosed", "Partially Open", "Open"]} onChange={v => setV("building_enclosure",v)} /></QField>
+                <QField label="C1.10 Wall Material" sub="Low (Reinforced Concrete) ; Moderate (Reinforced Masonry) ; High (Unreinforced Masonry, Glass, Wood, Bamboo)"><QualitativeSelect multiple value={vuln.wall_material ?? []} options={["Reinforced Concrete", "Reinforced Masonry", "Unreinforced Masonry", "Wood", "Bamboo", "Glass", "Masonry"]} onChange={v => setV("wall_material",v)} /></QField>
+                <QField label="C1.11 Framing Type" sub="Low (Braced, Special Moment-Resisting Frame) ; Moderate (Shearwall) ; High (Ordinary Frame)"><QualitativeSelect multiple value={vuln.structural_framing_type ?? []} options={["Braced","Special Moment-Resisting Frame","Shearwall","Ordinary Frame"]} onChange={v => setV("structural_framing_type",v)} /></QField>
+                <QField label="C1.12 Flooring Material" sub="Low (Tiles, Concrete) ; Moderate (Hardwood) ; High (Earth Mud)"><QualitativeSelect multiple value={vuln.flooring_material ?? []} options={["Concrete", "Tiles", "Hardwood", "Earth Mud"]} onChange={v => setV("flooring_material",v)} /></QField>
               </Section>
 
               <Section title="C2 — Building Condition">
@@ -721,10 +724,10 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
               </Section>
 
               <Section title="C3 & C4 — Roof & Fasteners">
-                <QField label="C3.1 Roof Design" sub="Low (Hip) ; Moderate (Dutch/Gable) ; High (Monoslope)"><QualitativeSelect multiple value={vuln.roof_design ?? []} options={["Hip","Dutch Hip","Gable","Cross Hip Roof","Monoslope"]} onChange={v => setV("roof_design",v)} /></QField>
+                <QField label="C3.1 Roof Design" sub="Low (Hip) ; Moderate (Dutch Hip Roofs/Gable) ; High (Monoslope)"><QualitativeSelect multiple value={vuln.roof_design ?? []} options={["Hip","Dutch Hip","Gable","Cross Hip Roof","Monoslope"]} onChange={v => setV("roof_design",v)} /></QField>
                 <QField label="C3.2 Roof Slope" sub="Low (30-45°) ; Moderate (>45°) ; High (<30°)"><QualitativeSelect value={vuln.roof_slope ?? ""} options={["30 to 45 degrees", "above 45 degrees", "below 30 degrees"]} onChange={v => setV("roof_slope",v)} /></QField>
-                <QField label="C3.3 Roofing Material" sub="Low (Tiles/RC) ; Moderate (GI/Metal) ; High (Wood/Thatch)"><QualitativeSelect multiple value={vuln.roofing_material ?? []} options={["Tiles", "Concrete", "Galvanized Iron Sheets", "Metals", "Asphalt Shingles", "Wood", "Thatch", "Shingles"]} onChange={v => setV("roofing_material",v)} /></QField>
-                <QField label="C4.1 Roof Fasteners" sub="Low (Screw) ; Moderate (Nails) ; High (Staples)"><QualitativeSelect multiple value={vuln.roof_fastener ?? []} options={["Metal Screw", "Nails", "Staples", "Hazel Spars"]} onChange={v => setV("roof_fastener",v)} /></QField>
+                <QField label="C3.3 Roofing Material" sub="Low (Tiles, Concrete) ; Moderate (Galvanized Iron Sheets, Metals) ; High (Wood, Shingles, Thatch)"><QualitativeSelect multiple value={vuln.roofing_material ?? []} options={["Tiles", "Concrete", "Galvanized Iron Sheets", "Metals", "Asphalt Shingles", "Wood", "Thatch", "Shingles"]} onChange={v => setV("roofing_material",v)} /></QField>
+                <QField label="C4.1 Roof Fasteners" sub="Low (Metal Screw) ; Moderate (Nails) ; High (Staples)"><QualitativeSelect multiple value={vuln.roof_fastener ?? []} options={["Metal Screw", "Nails", "Staples", "Hazel Spars"]} onChange={v => setV("roof_fastener",v)} /></QField>
                 <QField label="C4.2 Fastener Spacing (mm)" sub="Low (<225) ; Moderate (226-450) ; High (>450)"><input className="input-field" value={numInputs.roof_fastener_distance_mm ?? vuln.roof_fastener_distance_mm ?? ""} onChange={e => handleNum("roof_fastener_distance_mm", e.target.value, setV)} /></QField>
               </Section>
 
