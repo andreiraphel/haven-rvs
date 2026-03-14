@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export const dynamic = "force-dynamic";
 
@@ -8,12 +7,8 @@ export async function POST(req: NextRequest) {
     const { buildingName, riskIndex, riskDescription, hazardData, vulnerabilityData, exposureData } =
       await req.json();
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ error: "GEMINI_API_KEY not configured" }, { status: 500 });
-    }
-
-    const ai = new GoogleGenerativeAI(apiKey);
+    // Use the provided key
+    const apiKey = process.env.VERTEX_API_KEY; 
 
     // Process multi-select fields
     const processMultiSelect = (data: any) => {
@@ -29,7 +24,7 @@ export async function POST(req: NextRequest) {
     const processedHazardData = processMultiSelect(hazardData);
     const processedVulnerabilityData = processMultiSelect(vulnerabilityData);
 
-    const prompt = `You are a Lead Structural Forensic Engineer and Heritage Conservation Specialist. 
+    const prompt = `You are a Lead Structural Forensic Engineer and Heritage Conservation Specialist.     
     Provide a rigorous, data-driven technical assessment for "${buildingName}".
 
     ENGINEERING DATASET:
@@ -52,38 +47,63 @@ export async function POST(req: NextRequest) {
     - Priority 5: Geotechnical/Foundation address.
     - Priority 6: Monitoring protocols.
 
-    RESPONSE FORMAT: Return ONLY a JSON object with keys "narrative" and "courseOfAction". 
+    RESPONSE FORMAT: Return ONLY a JSON object with keys "narrative" and "courseOfAction".
     Format Course of Action as: 1. **[Heading]** [Detail]\\n2. **[Heading]** [Detail]...`;
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash"});
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
+    // Make raw REST call to Google AI Studio (which accepts API Keys natively)
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    
+    const geminiReq = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: prompt }]
+        }],
+        generationConfig: {
+          temperature: 0.2,
+        }
+      })
+    });
 
-    if (!response) {
-      throw new Error("All AI models failed to respond.");
+    const rawResponse = await geminiReq.text(); 
+
+    if (!geminiReq.ok) {
+      console.error("Gemini API Error Status:", geminiReq.status);
+      console.error("Gemini API Error Body:", rawResponse);
+      throw new Error(`Gemini request failed with status: ${geminiReq.status}. See server logs.`);
     }
 
-    const text = response.text() || "";
-    
-    // Clean and parse the response
+    let data;
+    try {
+        data = JSON.parse(rawResponse);
+    } catch(err) {
+        console.error("Failed to parse Gemini response:", rawResponse);
+        throw new Error("Gemini returned invalid JSON");
+    }
+
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+    // Clean and parse the generated AI response
     let cleanText = text.replace(/```json/g, "").replace(/```/g, "").trim();
-    
+
     try {
       const parsed = JSON.parse(cleanText);
-      return NextResponse.json({ 
-        narrative: parsed.narrative || "No narrative generated.", 
-        courseOfAction: parsed.courseOfAction || "1. Perform structural audit." 
+      return NextResponse.json({
+        narrative: parsed.narrative || "No narrative generated.",
+        courseOfAction: parsed.courseOfAction || "1. Perform structural audit."
       });
     } catch (e) {
       console.error("Gemini Parse Error:", text);
-      return NextResponse.json({ 
-        narrative: text.substring(0, 500), 
-        courseOfAction: "1. **Parsing Error** AI output format was unexpected." 
+      return NextResponse.json({
+        narrative: text.substring(0, 500),
+        courseOfAction: "1. **Parsing Error** AI output format was unexpected."
       });
     }
   } catch (err: any) {
-    console.error("Gemini API Error:", err);
+    console.error("Gemini Route Error:", err);
     return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 });
   }
 }
