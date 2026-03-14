@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export const dynamic = "force-dynamic";
 
@@ -13,10 +13,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "GEMINI_API_KEY not configured" }, { status: 500 });
     }
 
-    // Initialize the client inside the handler
-    const ai = new GoogleGenAI({
-      apiKey: apiKey
-    });
+    const ai = new GoogleGenerativeAI(apiKey);
+
+    // Process multi-select fields
+    const processMultiSelect = (data: any) => {
+      const processedData = { ...data };
+      for (const key in processedData) {
+        if (Array.isArray(processedData[key])) {
+          processedData[key] = processedData[key].join(', ');
+        }
+      }
+      return processedData;
+    };
+
+    const processedHazardData = processMultiSelect(hazardData);
+    const processedVulnerabilityData = processMultiSelect(vulnerabilityData);
 
     const prompt = `You are a Lead Structural Forensic Engineer and Heritage Conservation Specialist. 
     Provide a rigorous, data-driven technical assessment for "${buildingName}".
@@ -24,8 +35,8 @@ export async function POST(req: NextRequest) {
     ENGINEERING DATASET:
     - Statistical Risk Index: ${riskIndex}/10
     - Risk Classification: ${riskDescription}
-    - Hazard Profile: ${JSON.stringify(hazardData)}
-    - Structural Vulnerability: ${JSON.stringify(vulnerabilityData)}
+    - Hazard Profile: ${JSON.stringify(processedHazardData)}
+    - Structural Vulnerability: ${JSON.stringify(processedVulnerabilityData)}
     - Heritage/Exposure Value: ${JSON.stringify(exposureData)}
 
     PHASE 1: NARRATIVE TECHNICAL SUMMARY (Exactly 5 sentences):
@@ -44,35 +55,16 @@ export async function POST(req: NextRequest) {
     RESPONSE FORMAT: Return ONLY a JSON object with keys "narrative" and "courseOfAction". 
     Format Course of Action as: 1. **[Heading]** [Detail]\\n2. **[Heading]** [Detail]...`;
 
-    // Tiered Fallback: 3 -> 2.0 -> 1.5
-    let response;
-    const models = ["gemini-3-flash-preview", "gemini-2.0-flash", "gemini-1.5-flash"];
-    let lastError;
-
-    for (const modelName of models) {
-      try {
-        console.log(`Attempting Gemini model: ${modelName}...`);
-        response = await ai.models.generateContent({
-          model: modelName,
-          contents: prompt,
-        });
-        if (response && response.text) {
-          console.log(`✅ Success with ${modelName}`);
-          break; 
-        }
-      } catch (err: any) {
-        lastError = err;
-        console.warn(`⚠️ ${modelName} failed: ${err.message || err.status}`);
-        // Small delay before trying next model to allow 429s to breathe
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash"});
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
 
     if (!response) {
-      throw lastError || new Error("All AI models failed to respond.");
+      throw new Error("All AI models failed to respond.");
     }
 
-    const text = response.text || "";
+    const text = response.text() || "";
     
     // Clean and parse the response
     let cleanText = text.replace(/```json/g, "").replace(/```/g, "").trim();
@@ -91,7 +83,7 @@ export async function POST(req: NextRequest) {
       });
     }
   } catch (err: any) {
-    console.error("Gemini 3 Implementation SDK Error:", err);
+    console.error("Gemini API Error:", err);
     return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 });
   }
 }

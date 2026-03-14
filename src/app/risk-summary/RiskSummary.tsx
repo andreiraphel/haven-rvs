@@ -248,7 +248,7 @@ function DetailModal({ assessment: a, onClose, router }: { assessment: Assessmen
       footer={
         <div className="flex gap-3 w-full sm:w-auto">
           <button className="btn-secondary flex-1 sm:flex-none" onClick={onClose}>Close</button>
-          <button className="btn-primary flex-1 sm:flex-none" onClick={() => router.push(`/questionnaire?editId=${a.building.id}`)}>Edit Assessment</button>
+          <button className="btn-primary flex-1 sm:flex-none" onClick={() => router.push(`/edit-assessment/${a.building.id}`)}>Edit Assessment</button>
         </div>
       }
     >

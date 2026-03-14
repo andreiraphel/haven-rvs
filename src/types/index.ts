@@ -35,7 +35,7 @@ export interface HazardIndicators {
   elevation_m: number;
   distance_to_water_m: number;
   water_body_name?: string;
-  surface_runoff: string;
+  surface_runoff: string | string[];
   base_height: string;
   drainage_system: string;
 }
@@ -45,17 +45,17 @@ export interface VulnerabilityIndicators {
   building_id: string;
   // Structural
   building_code: string;
-  plan_irregularity: string;
+  plan_irregularity: string | string[];
   vertical_irregularity: string;
   building_proximity: string;
   number_of_stories: number;
-  structural_material: string;
+  structural_material: string | string[];
   number_of_bays: number;
   column_spacing_m: number;
-  building_enclosure: string;
-  wall_material: string;
-  structural_framing_type: string;
-  flooring_material: string;
+  building_enclosure: string | string[];
+  wall_material: string | string[];
+  structural_framing_type: string | string[];
+  flooring_material: string | string[];
   // Condition
   maximum_crack: string;
   uneven_settlement: boolean;
@@ -64,10 +64,10 @@ export interface VulnerabilityIndicators {
   decay_of_structural_member: boolean;
   additional_loads: boolean;
   // Roof
-  roof_design: string;
+  roof_design: string | string[];
   roof_slope: string;
-  roofing_material: string;
-  roof_fastener: string;
+  roofing_material: string | string[];
+  roof_fastener: string | string[];
   roof_fastener_distance_mm: number;
 }
 

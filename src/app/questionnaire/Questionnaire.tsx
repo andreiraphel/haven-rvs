@@ -99,17 +99,17 @@ function SurveySelect({ value, onChange }: { value: number; onChange: (v: number
   );
 }
 
-export default function QuestionnairePage() {
+export default function Questionnaire({ assessmentId }: { assessmentId?: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const editId = searchParams.get("editId");
+  const editId = assessmentId || searchParams.get("editId");
   const isEditing = !!editId;
 
   const [step, setStep]       = useState<Step>("building");
   const [building, setBuilding] = useState<Partial<Building>>({});
   const [buildingId, setBuildingId] = useState<string | null>(null);
   const currentYear = new Date().getFullYear();
-  
+
   useEffect(() => {
     async function checkAuth() {
       const { data: { session } } = await getSupabase().auth.getSession();
@@ -119,7 +119,6 @@ export default function QuestionnairePage() {
     }
     checkAuth();
   }, [router]);
-
   const [hazard, setHazard]   = useState<Partial<HazardIndicators>>({});
   const [vuln, setVuln]       = useState<Partial<VulnerabilityIndicators>>({});
   const [exposure, setExposure] = useState<Partial<ExposureIndicators>>({
@@ -142,17 +141,39 @@ export default function QuestionnairePage() {
       try {
         const sb = getSupabase();
         
+        // Ensure session is loaded before making requests (avoids RLS blocking)
+        await sb.auth.getSession();
+        
         const { data: bData, error: bErr } = await sb.from("buildings").select("*").eq("id", editId).single();
         if (bErr) throw bErr;
         
-        const { data: hData } = await sb.from("hazard_indicators").select("*").eq("building_id", editId).single();
-        const { data: vData } = await sb.from("vulnerability_indicators").select("*").eq("building_id", editId).single();
-        const { data: eData } = await sb.from("exposure_indicators").select("*").eq("building_id", editId).single();
+        const { data: hData } = await sb.from("hazard_indicators").select("*").eq("building_id", editId).maybeSingle();
+        const { data: vData } = await sb.from("vulnerability_indicators").select("*").eq("building_id", editId).maybeSingle();
+        const { data: eData } = await sb.from("exposure_indicators").select("*").eq("building_id", editId).maybeSingle();
         
         setBuilding(bData || {});
         setBuildingId(editId);
-        if (hData) setHazard(hData);
-        if (vData) setVuln(vData);
+
+        const parseMulti = (val: any) => {
+          if (!val) return [];
+          if (Array.isArray(val)) return val;
+          if (typeof val === 'string') {
+            try { return JSON.parse(val); } catch(e) { return val.split(',').map(s => s.trim()); }
+          }
+          return [];
+        };
+
+        if (hData) {
+          if (hData.surface_runoff) hData.surface_runoff = parseMulti(hData.surface_runoff);
+          setHazard(hData);
+        }
+        if (vData) {
+          const multiFields = ["plan_irregularity", "structural_material", "building_enclosure", "wall_material", "structural_framing_type", "flooring_material", "roof_design", "roofing_material", "roof_fastener"];
+          multiFields.forEach(f => {
+            if (vData[f]) vData[f] = parseMulti(vData[f]);
+          });
+          setVuln(vData);
+        }
         if (eData) setExposure(eData);
 
         // Pre-fill number inputs as strings
@@ -238,34 +259,34 @@ export default function QuestionnairePage() {
       elevation_m: randNum(1, 50),
       distance_to_water_m: randNum(10, 1000),
       water_body_name: "Inland Creek",
-      surface_runoff: pick(["Soil", "Grass", "Grass/Soil", "Grass/Concrete", "Concrete"]),
+      surface_runoff: [pick(["Lawn", "Grass", "Clay", "Concrete", "Asphalt", "Brick"])],
       base_height: pick(["Base is higher", "Same Level", "Base is lower"]),
       drainage_system: pick(["Closed drainage system", "Open drainage system", "No Drainage System"])
     };
 
     const stubVuln = {
       building_code: pick(["New Code (1992-present)", "Post-Code (1972-1991)", "Pre-Code (before 1972)"]),
-      plan_irregularity: pick(["Rectangular", "Square", "T- shaped", "Irregular Shaped", "L-shaped"]),
+      plan_irregularity: [pick(["Rectangular", "Square", "T- shaped", "Irregular Shaped", "L-shaped"])],
       vertical_irregularity: pick(["No vertical irregularity", "1 Vertical Irregularity", "2 Vertical Irregularities"]),
       building_proximity: pick(["No adjacent buildings", "6 inches and above", "below 6 inches"]),
       number_of_stories: stubBuilding.number_of_floors,
-      structural_material: stubBuilding.building_type === "Timber Building" ? "Timber Frame" : pick(["Reinforced Concrete", "Unreinforced Masonry"]),
-      structural_framing_type: pick(["Braced", "Special Moment-Resisting Frame", "Shearwall", "Ordinary Frame"]),
+      structural_material: [stubBuilding.building_type === "Timber Building" ? "Timber Frame" : pick(["Reinforced Concrete", "Unreinforced Masonry"])],
+      structural_framing_type: [pick(["Braced", "Special Moment-Resisting Frame", "Shearwall", "Ordinary Frame"])],
       number_of_bays: profile === 0 ? 5 + Math.floor(Math.random()*3) : profile === 1 ? 3 + Math.floor(Math.random()*2) : 1 + Math.floor(Math.random()*2),
       column_spacing_m: randNum(2, 8),
-      building_enclosure: pick(["Enclosed", "Partially Open", "Open"]),
-      wall_material: pick(["Reinforced Concrete", "Reinforced Masonry", "Unreinforced Masonry", "Wood", "Bamboo", "Glass", "Masonry"]),
-      flooring_material: pick(["Concrete", "Tiles", "Hardwood", "Bamboo", "Earth Mud"]),
+      building_enclosure: [pick(["Enclosed", "Partially Open", "Open"])],
+      wall_material: [pick(["Reinforced Concrete", "Reinforced Masonry", "Unreinforced Masonry", "Wood", "Bamboo", "Glass", "Masonry"])],
+      flooring_material: [pick(["Concrete", "Tiles", "Hardwood", "Bamboo", "Earth Mud"])],
       maximum_crack: profile === 0 ? "0.1 mm" : profile === 1 ? "2.0 mm" : "12.0 mm",
       uneven_settlement: profile === 2 ? Math.random() > 0.3 : Math.random() > 0.8,
       beam_column_deformations: profile === 2 ? Math.random() > 0.3 : Math.random() > 0.8,
       finishing_condition: profile === 2 ? Math.random() > 0.3 : Math.random() > 0.8,
       decay_of_structural_member: profile === 2 ? Math.random() > 0.2 : Math.random() > 0.9,
       additional_loads: profile === 2 ? Math.random() > 0.4 : Math.random() > 0.9,
-      roof_design: pick(["Hip", "Dutch Hip", "Gable", "Cross Hip Roof", "Monoslope"]),
+      roof_design: [pick(["Hip", "Dutch Hip", "Gable", "Cross Hip Roof", "Monoslope"])],
       roof_slope: pick(["30 to 45 degrees", "above 45 degrees", "below 30 degrees"]),
-      roofing_material: pick(["Tiles", "Concrete", "Galvanized Iron Sheets", "Metals", "Asphalt Shingles", "Wood", "Thatch", "Shingles"]),
-      roof_fastener: pick(["Metal Screw", "Nails", "Staples", "Hazel Spars"]),
+      roofing_material: [pick(["Tiles", "Concrete", "Galvanized Iron Sheets", "Metals", "Asphalt Shingles", "Wood", "Thatch", "Shingles"])],
+      roof_fastener: [pick(["Metal Screw", "Nails", "Staples", "Hazel Spars"])],
       roof_fastener_distance_mm: randNum(150, 600)
     };
 
@@ -277,7 +298,10 @@ export default function QuestionnairePage() {
       b41: randScore(), b42: randScore(), b43: randScore(), b44: randScore()
     };
 
-    setBuilding(stubBuilding); setHazard(stubHazard); setVuln(stubVuln); setExposure(stubExposure);
+    setBuilding(prev => ({ ...stubBuilding, id: prev.id, created_by: prev.created_by, created_at: prev.created_at })); 
+    setHazard(prev => ({ ...stubHazard, id: prev.id, building_id: prev.building_id, created_at: prev.created_at })); 
+    setVuln(prev => ({ ...stubVuln, id: prev.id, building_id: prev.building_id, created_at: prev.created_at })); 
+    setExposure(prev => ({ ...stubExposure, id: prev.id, building_id: prev.building_id, created_at: prev.created_at }));
     const strings: Record<string, string> = {};
     Object.entries(stubBuilding).forEach(([k, v]) => { if (typeof v === 'number') strings[k] = String(v); });
     Object.entries(stubHazard).forEach(([k, v]) => { if (typeof v === 'number') strings[k] = String(v); });
@@ -393,21 +417,46 @@ export default function QuestionnairePage() {
         
         let hRes, vRes, eRes;
 
+        const stringifyMulti = (val: any) => Array.isArray(val) ? val.join(",") : val;
+
         if (isEditing) {
           // Remove unique IDs and timestamps before updating to prevent Supabase errors
           const { id: hId, created_at: hCat, building_id: hbId, ...cleanHazard } = hazard as any;
           const { id: vId, created_at: vCat, building_id: vbId, ...cleanVuln } = vuln as any;
           const { id: eId, created_at: eCat, building_id: ebId, ...cleanExposure } = finalExposure as any;
 
-          [hRes, vRes, eRes] = await Promise.all([
-            sb.from("hazard_indicators").update(cleanHazard).eq("building_id", activeBuildingId),
-            sb.from("vulnerability_indicators").update(cleanVuln).eq("building_id", activeBuildingId),
-            sb.from("exposure_indicators").update(cleanExposure).eq("building_id", activeBuildingId)
-          ]);
+          cleanHazard.surface_runoff = stringifyMulti(cleanHazard.surface_runoff);
+          const multiFields = ["plan_irregularity", "structural_material", "building_enclosure", "wall_material", "structural_framing_type", "flooring_material", "roof_design", "roofing_material", "roof_fastener"];
+          multiFields.forEach(f => {
+            if (cleanVuln[f]) cleanVuln[f] = stringifyMulti(cleanVuln[f]);
+          });
+
+          const hPromise = hId 
+            ? sb.from("hazard_indicators").update(cleanHazard).eq("id", hId)
+            : sb.from("hazard_indicators").insert({ ...cleanHazard, building_id: activeBuildingId });
+          
+          const vPromise = vId 
+            ? sb.from("vulnerability_indicators").update(cleanVuln).eq("id", vId)
+            : sb.from("vulnerability_indicators").insert({ ...cleanVuln, building_id: activeBuildingId });
+
+          const ePromise = eId 
+            ? sb.from("exposure_indicators").update(cleanExposure).eq("id", eId)
+            : sb.from("exposure_indicators").insert({ ...cleanExposure, building_id: activeBuildingId });
+
+          [hRes, vRes, eRes] = await Promise.all([hPromise, vPromise, ePromise]);
         } else {
+          const newHazard = { ...hazard };
+          newHazard.surface_runoff = stringifyMulti(newHazard.surface_runoff);
+          
+          const newVuln = { ...vuln };
+          const multiFields = ["plan_irregularity", "structural_material", "building_enclosure", "wall_material", "structural_framing_type", "flooring_material", "roof_design", "roofing_material", "roof_fastener"];
+          multiFields.forEach(f => {
+            if (newVuln[f]) newVuln[f] = stringifyMulti(newVuln[f]);
+          });
+
           [hRes, vRes, eRes] = await Promise.all([
-            sb.from("hazard_indicators").insert({ ...hazard, building_id: activeBuildingId }),
-            sb.from("vulnerability_indicators").insert({ ...vuln, building_id: activeBuildingId }),
+            sb.from("hazard_indicators").insert({ ...newHazard, building_id: activeBuildingId }),
+            sb.from("vulnerability_indicators").insert({ ...newVuln, building_id: activeBuildingId }),
             sb.from("exposure_indicators").insert(finalExposure)
           ]);
         }
@@ -519,7 +568,7 @@ export default function QuestionnairePage() {
       <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
         <div className="mb-7 flex flex-col sm:flex-row justify-between items-start gap-4">
           <div>
-            <h2 className="font-sora font-bold text-2xl text-ink">New Assessment</h2>
+            <h2 className="font-sora font-bold text-2xl text-ink">{isEditing ? "Edit Assessment" : "New Assessment"}</h2>
             <p className="text-[var(--ink-lt)] text-sm mt-1">Fill in all sections based on structural audit reference.</p>
           </div>
           <button onClick={fillStub} className="btn-secondary text-[10px] uppercase tracking-widest px-4 py-2 w-full sm:w-auto shadow-sm">⚡ Fill Test Data</button>
