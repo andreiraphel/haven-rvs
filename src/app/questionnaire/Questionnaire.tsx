@@ -1,10 +1,13 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Topbar from "@/components/layout/Topbar";
 import type { Building, HazardIndicators, VulnerabilityIndicators, ExposureIndicators, RiskResult, RiskLevel } from "@/types";
 import { getSupabase } from "@/lib/supabase";
 import { calculateAssessmentRisk } from "@/lib/risk-calculator";
+import { RUNOFF_MAP, PLAN_MAP, MAT_MAP, ENCL_MAP, WALL_MAP, FRAME_MAP, FLOOR_MAP, ROOF_DESIGN_MAP, ROOF_MAT_MAP, FAST_TYPE_MAP } from "@/lib/maps";
+
+// ... (rest of the file is the same until computeAndShow)
 
 type Step = "building" | "hazard" | "exposure" | "vulnerability" | "result";
 
@@ -16,25 +19,58 @@ const STEPS: { key: Step; label: string; icon: string }[] = [
   { key: "result",        label: "Weight Summary",     icon: "📊" },
 ];
 
-function QualitativeSelect({ value, options, onChange }: { value: string; options: string[]; onChange: (v: string) => void }) {
+type QualitativeSelectProps = {
+  value: string | string[]
+  options: string[]
+  onChange: (v: string | string[]) => void
+  multiple?: boolean
+}
+
+function QualitativeSelect({
+  value,
+  options,
+  onChange,
+  multiple = false,
+}: QualitativeSelectProps) {
+  const toggle = (opt: string) => {
+    if (!multiple) {
+      // single-select mode
+      onChange(opt)
+    } else {
+      // multi-select mode
+      const arr = Array.isArray(value) ? value : []
+      if (arr.includes(opt)) {
+        onChange(arr.filter(v => v !== opt))
+      } else {
+        onChange([...arr, opt])
+      }
+    }
+  }
+
   return (
     <div className="flex flex-wrap gap-2">
-      {options.map(opt => (
-        <button
-          key={opt}
-          type="button"
-          onClick={() => onChange(opt)}
-          className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
-            value === opt
-              ? "bg-bark text-white border-bark shadow-sm"
-              : "bg-white text-[var(--ink-lt)] border-[var(--border)] hover:bg-sand"
-          }`}
-        >
-          {opt}
-        </button>
-      ))}
+      {options.map(opt => {
+        const selected = multiple
+          ? Array.isArray(value) && value.includes(opt)
+          : value === opt
+
+        return (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => toggle(opt)}
+            className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
+              selected
+                ? "bg-bark text-white border-bark shadow-sm"
+                : "bg-white text-[var(--ink-lt)] border-[var(--border)] hover:bg-sand"
+            }`}
+          >
+            {opt}
+          </button>
+        )
+      })}
     </div>
-  );
+  )
 }
 
 function SurveySelect({ value, onChange }: { value: number; onChange: (v: number) => void }) {
@@ -65,8 +101,14 @@ function SurveySelect({ value, onChange }: { value: number; onChange: (v: number
 
 export default function QuestionnairePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get("editId");
+  const isEditing = !!editId;
+
   const [step, setStep]       = useState<Step>("building");
   const [building, setBuilding] = useState<Partial<Building>>({});
+  const [buildingId, setBuildingId] = useState<string | null>(null);
+  const currentYear = new Date().getFullYear();
   
   useEffect(() => {
     async function checkAuth() {
@@ -92,6 +134,42 @@ export default function QuestionnairePage() {
   const [error, setError]     = useState<string | null>(null);
 
   const [numInputs, setNumInputs] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    async function loadEditData() {
+      if (!editId) return;
+      setLoading(true);
+      try {
+        const sb = getSupabase();
+        
+        const { data: bData, error: bErr } = await sb.from("buildings").select("*").eq("id", editId).single();
+        if (bErr) throw bErr;
+        
+        const { data: hData } = await sb.from("hazard_indicators").select("*").eq("building_id", editId).single();
+        const { data: vData } = await sb.from("vulnerability_indicators").select("*").eq("building_id", editId).single();
+        const { data: eData } = await sb.from("exposure_indicators").select("*").eq("building_id", editId).single();
+        
+        setBuilding(bData || {});
+        setBuildingId(editId);
+        if (hData) setHazard(hData);
+        if (vData) setVuln(vData);
+        if (eData) setExposure(eData);
+
+        // Pre-fill number inputs as strings
+        const strings: Record<string, string> = {};
+        if (bData) Object.entries(bData).forEach(([k, v]) => { if (typeof v === 'number') strings[k] = String(v); });
+        if (hData) Object.entries(hData).forEach(([k, v]) => { if (typeof v === 'number') strings[k] = String(v); });
+        if (vData) Object.entries(vData).forEach(([k, v]) => { if (typeof v === 'number') strings[k] = String(v); });
+        setNumInputs(strings);
+      } catch (err: any) {
+        console.error("Failed to load assessment for editing", err);
+        setError("Failed to load existing assessment. " + err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadEditData();
+  }, [editId]);
 
   function setB(k: string, v: unknown) { setBuilding(f => ({ ...f, [k]: v })); }
   function setH(k: string, v: unknown) { setHazard(f => ({ ...f, [k]: v })); }
@@ -208,156 +286,187 @@ export default function QuestionnairePage() {
   }
 
   async function computeAndShow() {
-    console.log("🚀 START: Compute Index Pressed");
-    setLoading(true); setError(null);
-    try {
-      const sb = getSupabase();
-      const { data: { user } } = await sb.auth.getUser();
-      if (!user) throw new Error("You must be logged in to submit an assessment.");
-      console.log("👤 User authenticated:", user.id);
-
-      // Manual Computation
-      console.log("🔢 Running Manual Computation...");
-      const manualResult = calculateAssessmentRisk(
-        hazard as HazardIndicators,
-        vuln as VulnerabilityIndicators,
-        Number(building.year_built ?? 1950),
-        isStubFilled,
-        exposure as ExposureIndicators
-      );
-      console.log("✅ Manual Result:", manualResult);
-
-      const { data: { session } } = await sb.auth.getSession();
-      console.log("💾 Saving Building to Supabase...");
-      const buildingRes = await fetch("/api/buildings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ ...building, created_by: user.id }),
-      });
-      if (!buildingRes.ok) throw new Error("Failed to save building");
-      const savedBuilding = await buildingRes.json();
-      console.log("✅ Building Saved:", savedBuilding.id);
-
-      await sb.from("questionnaire_responses").insert({
-        building_id: savedBuilding.id, step: "final_submission",
-        response: { building, hazard, vulnerability: vuln, exposure }
-      });
-
-      // Calculate b21 based on age
-      const age = 2024 - Number(building.year_built ?? 2024);
-      const b21 = age <= 75 ? 1 : age <= 125 ? 2 : 3;
-      const finalExposure = { ...exposure, b21, building_id: savedBuilding.id };
-
-      // Fetch ML Prediction
-      console.log("🤖 Calling ML API /api/predict...");
-      let mlPred = 0;
+      console.log("🚀 START: Compute Index Pressed");
+      setLoading(true); setError(null);
       try {
-        const mlRes = await fetch("/api/predict", {
+        const sb = getSupabase();
+        const { data: { user } } = await sb.auth.getUser();
+        if (!user) throw new Error("You must be logged in to submit an assessment.");
+        console.log("👤 User authenticated:", user.id);
+
+        // Manual Computation
+        console.log("🔢 Running Manual Computation...");
+        const manualResult = calculateAssessmentRisk(
+          hazard as HazardIndicators,
+          vuln as VulnerabilityIndicators,
+          Number(building.year_built ?? 1950),
+          isStubFilled,
+          exposure as ExposureIndicators
+        );
+        console.log("✅ Manual Result:", manualResult);
+
+        const { data: { session } } = await sb.auth.getSession();
+        console.log("💾 Saving Building to Supabase...");
+        const buildingRes = await fetch("/api/buildings", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            hazard: hazard,
-            vulnerability: vuln,
-            exposure: finalExposure,
-            year_built: Number(building.year_built ?? 1950),
-            isStub: isStubFilled
-          }),
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ ...building, created_by: user.id }),
         });
-        if (mlRes.ok) {
-          const mlData = await mlRes.json();
-          mlPred = mlData.ml_prediction;
-          console.log("✅ ML Prediction Success:", mlPred);
-        } else {
-          console.error("❌ ML Prediction failed with status:", mlRes.status);
-        }
-      } catch (mlErr) { console.error("❌ ML Prediction API call crashed:", mlErr); }
+        if (!buildingRes.ok) throw new Error("Failed to save building");
+        const savedBuilding = await buildingRes.json();
+        console.log("✅ Building Saved:", savedBuilding.id);
 
-      // 3. Save all indicators
-      console.log("📊 Saving Indicators...");
-      const [hRes, vRes, eRes] = await Promise.all([
-        sb.from("hazard_indicators").insert({ ...hazard, building_id: savedBuilding.id }),
-        sb.from("vulnerability_indicators").insert({ ...vuln, building_id: savedBuilding.id }),
-        sb.from("exposure_indicators").insert(finalExposure)
-      ]);
-
-      if (hRes.error) throw new Error(`Hazard data failed: ${hRes.error.message}`);
-      if (vRes.error) throw new Error(`Vulnerability data failed: ${vRes.error.message}`);
-      if (eRes.error) throw new Error(`Exposure data failed: ${eRes.error.message}`);
-      console.log("✅ Indicators Saved");
-
-      // 4. Generate AI Narrative & COA
-      console.log("🧠 Calling Gemini AI /api/gemini...");
-      let aiNarrative = ""; let aiCOA = "";
-      try {
-        const geminiRes = await fetch("/api/gemini", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            buildingName: building.name, 
-            riskIndex: manualResult.risk_index,
-            riskDescription: manualResult.risk_description, 
-            hazardData: hazard, 
-            vulnerabilityData: vuln,
-            exposureData: finalExposure,
-          }),
+        await sb.from("questionnaire_responses").insert({
+          building_id: savedBuilding.id, step: "final_submission",
+          response: { building, hazard, vulnerability: vuln, exposure }
         });
-        if (geminiRes.ok) {
-          const gData = await geminiRes.json();
-          aiNarrative = gData.narrative; aiCOA = gData.courseOfAction;
-          console.log("✅ Gemini AI Success");
-        } else {
-          console.error("❌ Gemini API failed with status:", geminiRes.status);
+
+        // Calculate b21 based on age
+        const age = currentYear - Number(building.year_built ?? currentYear);
+        const b21 = age <= 75 ? 1 : age <= 125 ? 2 : 3;
+        const finalExposure = { ...exposure, b21, building_id: savedBuilding.id };
+
+        // Process multi-select fields for ML prediction and Gemini API
+        const getHighestValue = (value: string | string[] | undefined, map: Record<string, number>): string | undefined => {
+          if (Array.isArray(value)) {
+            if (value.length === 0) return undefined;
+            let maxValue = -1;
+            let maxKey: string | undefined = undefined;
+            for (const item of value) {
+              const currentVal = map[item];
+              if (currentVal > maxValue) {
+                maxValue = currentVal;
+                maxKey = item;
+              }
+            }
+            return maxKey;
+          }
+          return value;
         }
-      } catch (gErr) { console.error("❌ Gemini AI call crashed:", gErr); }
 
-      if (!aiNarrative) aiNarrative = `Assessment for ${building.name}: Index ${manualResult.risk_index.toFixed(2)} (${manualResult.risk_description}).`;
-      if (!aiCOA) aiCOA = "1. Structural audit\n2. Connection check\n3. Decay check\n4. Disaster plan";
+        const processedHazard = { ...hazard };
+        processedHazard.surface_runoff = getHighestValue(hazard.surface_runoff, RUNOFF_MAP);
 
-      // 5. Finalize Result (ML is primary, Manual is fallback/support)
-      const primaryIndex = mlPred > 0 ? mlPred : manualResult.risk_index;
-      
-      // Determine description based on the Primary (ML) Index
-      let finalDesc: RiskLevel = "LOW RISK";
-      if (primaryIndex <= 3.58) finalDesc = "LOW RISK";
-      else if (primaryIndex <= 6.79) finalDesc = "MODERATE RISK";
-      else finalDesc = "HIGH RISK";
+        const processedVuln = { ...vuln };
+        processedVuln.plan_irregularity = getHighestValue(vuln.plan_irregularity, PLAN_MAP);
+        processedVuln.structural_material = getHighestValue(vuln.structural_material, MAT_MAP);
+        processedVuln.building_enclosure = getHighestValue(vuln.building_enclosure, ENCL_MAP);
+        processedVuln.wall_material = getHighestValue(vuln.wall_material, WALL_MAP);
+        processedVuln.structural_framing_type = getHighestValue(vuln.structural_framing_type, FRAME_MAP);
+        processedVuln.flooring_material = getHighestValue(vuln.flooring_material, FLOOR_MAP);
+        processedVuln.roof_design = getHighestValue(vuln.roof_design, ROOF_DESIGN_MAP);
+        processedVuln.roofing_material = getHighestValue(vuln.roofing_material, ROOF_MAT_MAP);
+        processedVuln.roof_fastener = getHighestValue(vuln.roof_fastener, FAST_TYPE_MAP);
 
-      console.log("🏁 Finalizing Result...");
-      const { error: rErr } = await sb.from("risk_results").insert({
-        building_id: savedBuilding.id, 
-        risk_index: primaryIndex, 
-        risk_description: finalDesc, 
-        hazard_rating: manualResult.hazard_rating,
-        vulnerability_rating: manualResult.vulnerability_rating, 
-        exposure_rating: manualResult.exposure_rating,
-        risk_rating: manualResult.risk_rating, 
-        ml_prediction: mlPred,
-        manual_index: manualResult.risk_index,
-        narrative: aiNarrative, 
-        ai_course_of_action: aiCOA,
-        assessed_by: user.id,
-      });
+        // Fetch ML Prediction
+        console.log("🤖 Calling ML API /api/predict...");
+        let mlPred = 0;
+        try {
+          const mlRes = await fetch("/api/predict", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              hazard: processedHazard,
+              vulnerability: processedVuln,
+              exposure: finalExposure,
+              year_built: Number(building.year_built ?? 1950),
+              isStub: isStubFilled
+            }),
+          });
+          if (mlRes.ok) {
+            const mlData = await mlRes.json();
+            mlPred = mlData.ml_prediction;
+            console.log("✅ ML Prediction Success:", mlPred);
+          } else {
+            console.error("❌ ML Prediction failed with status:", mlRes.status);
+          }
+        } catch (mlErr) { console.error("❌ ML Prediction API call crashed:", mlErr); }
 
-      if (rErr) throw new Error(`Risk result failed: ${rErr.message}`);
+        // 3. Save all indicators
+        console.log("📊 Saving Indicators...");
+        const [hRes, vRes, eRes] = await Promise.all([
+          sb.from("hazard_indicators").insert({ ...hazard, building_id: savedBuilding.id }),
+          sb.from("vulnerability_indicators").insert({ ...vuln, building_id: savedBuilding.id }),
+          sb.from("exposure_indicators").insert(finalExposure)
+        ]);
 
-      setResult({ 
-        ...manualResult, 
-        building_id: savedBuilding.id, 
-        risk_index: primaryIndex,
-        risk_description: finalDesc,
-        ml_prediction: mlPred, 
-        manual_index: manualResult.risk_index,
-        narrative: aiNarrative, 
-        ai_course_of_action: aiCOA 
-      });
-      console.log("🎉 SUCCESS: Moving to result step");
-      setStep("result");
-    } catch (err: any) {
-      console.error("❌ CRITICAL ERROR in computeAndShow:", err);
-      setError(err.message);
-    } finally { setLoading(false); }
-  }
+        if (hRes.error) throw new Error(`Hazard data failed: ${hRes.error.message}`);
+        if (vRes.error) throw new Error(`Vulnerability data failed: ${vRes.error.message}`);
+        if (eRes.error) throw new Error(`Exposure data failed: ${eRes.error.message}`);
+        console.log("✅ Indicators Saved");
 
+        // 4. Generate AI Narrative & COA
+        console.log("🧠 Calling Gemini AI /api/gemini...");
+        let aiNarrative = ""; let aiCOA = "";
+        try {
+          const geminiRes = await fetch("/api/gemini", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              buildingName: building.name,
+              riskIndex: mlPred,
+              riskDescription: mlPred,
+              hazardData: processedHazard,
+              vulnerabilityData: processedVuln,
+              exposureData: finalExposure,
+            }),
+          });
+          if (geminiRes.ok) {
+            const gData = await geminiRes.json();
+            aiNarrative = gData.narrative; aiCOA = gData.courseOfAction;
+            console.log("✅ Gemini AI Success");
+          } else {
+            console.error("❌ Gemini API failed with status:", geminiRes.status);
+          }
+        } catch (gErr) { console.error("❌ Gemini AI call crashed:", gErr); }
+
+        if (!aiNarrative) aiNarrative = `Assessment for ${building.name}: Index ${mlPred.toFixed(2)} (${mlPred}).`;
+        if (!aiCOA) aiCOA = "1. Structural audit\n2. Connection check\n3. Decay check\n4. Disaster plan";
+
+        // 5. Finalize Result (ML is primary, Manual is fallback/support)
+        const primaryIndex = mlPred > 0 ? mlPred : manualResult.risk_index;
+
+        // Determine description based on the Primary (ML) Index
+        let finalDesc: RiskLevel = "LOW RISK";
+        if (primaryIndex <= 3.58) finalDesc = "LOW RISK";
+        else if (primaryIndex <= 6.79) finalDesc = "MODERATE RISK";
+        else finalDesc = "HIGH RISK";
+
+        console.log("🏁 Finalizing Result...");
+        const { error: rErr } = await sb.from("risk_results").insert({
+          building_id: savedBuilding.id,
+          risk_index: primaryIndex,
+          risk_description: finalDesc,
+          hazard_rating: manualResult.hazard_rating,
+          vulnerability_rating: manualResult.vulnerability_rating,
+          exposure_rating: manualResult.exposure_rating,
+          risk_rating: mlPred,
+          ml_prediction: mlPred,
+          manual_index: manualResult.risk_index,
+          narrative: aiNarrative,
+          ai_course_of_action: aiCOA,
+          assessed_by: user.id,
+        });
+
+        if (rErr) throw new Error(`Risk result failed: ${rErr.message}`);
+
+        setResult({
+          ...manualResult,
+          building_id: savedBuilding.id,
+          risk_index: primaryIndex,
+          risk_description: finalDesc,
+          ml_prediction: mlPred,
+          manual_index: manualResult.risk_index,
+          narrative: aiNarrative,
+          ai_course_of_action: aiCOA
+        });
+        console.log("🎉 SUCCESS: Moving to result step");
+        setStep("result");
+      } catch (err: any) {
+        console.error("❌ CRITICAL ERROR in computeAndShow:", err);
+        setError(err.message);
+      } finally { setLoading(false); }
+    }
   const stepIdx = STEPS.findIndex(s => s.key === step);
   const riskColor = result ? result.risk_description === "LOW RISK" ? "text-[var(--risk-low)] bg-[var(--risk-low-bg)] border-[#b7e4cb]" : result.risk_description === "MODERATE RISK" ? "text-[var(--risk-mod)] bg-[var(--risk-mod-bg)] border-[#ffe0a0]" : "text-[var(--risk-high)] bg-[var(--risk-high-bg)] border-[#f5b8b8]" : "";
 
@@ -415,7 +524,7 @@ export default function QuestionnairePage() {
             <div className="space-y-6">
               <h3 className="font-sora font-bold text-lg text-ink">Hazard Indicators</h3>
               <Section title="A1 — Seismic">
-                <QField label="A1.1 Intensity (PEIS)" sub="Low(IV-) ; Mod(V-VI) ; High(VII+)"><QualitativeSelect value={hazard.earthquake_intensity ?? ""} options={["I","II","III","IV","V","VI","VII","VIII","IX","X"]} onChange={v => setH("earthquake_intensity",v)} /></QField>
+                <QField label="A1.1 PHIVOLCS EARTHQUAKE INTENSITY SCALE (PEIS)" sub="Low (Intensity IV and below) ; Moderate (Intensity V to Intensity VI) ; High (Intensity VII and above)"><QualitativeSelect value={hazard.earthquake_intensity ?? ""} options={["I","II","III","IV","V","VI","VII","VIII","IX","X"]} onChange={v => setH("earthquake_intensity",v)} /></QField>
                 <QField label="A1.2 Fault Distance (km)" sub="Low(>10) ; Mod(5-10) ; High(<5)"><input className="input-field" value={numInputs.fault_distance_km ?? hazard.fault_distance_km ?? ""} onChange={e => handleNum("fault_distance_km", e.target.value, setH)} /></QField>
                 <QField label="A1.3 Source (Mw)" sub="Low(<6.5) ; Mod(6.5-7) ; High(7-8.4)"><input className="input-field" value={numInputs.seismic_source_type ?? hazard.seismic_source_type ?? ""} onChange={e => handleNum("seismic_source_type", e.target.value, setH)} /></QField>
                 <QField label="A1.4 Liquefaction" sub="Low(Safe) ; Mod(Moderate) ; High(Highly)"><QualitativeSelect value={hazard.potential_liquefaction ?? ""} options={["Safe","Least Susceptible","Moderately Susceptible","Highly Susceptible"]} onChange={v => setH("potential_liquefaction",v)} /></QField>
@@ -428,7 +537,7 @@ export default function QuestionnairePage() {
                 <QField label="A3.1 Slope" sub="Low(1-8°) ; Mod(9-30°) ; High(>30°)"><QualitativeSelect value={hazard.slope_degrees ?? ""} options={["1-8 degrees","9-30 degrees","31-60 degrees","above 60 degrees"]} onChange={v => setH("slope_degrees",v)} /></QField>
                 <QField label="A3.2 Elevation (m)" sub="Low(>10) ; Mod(5-10) ; High(<5)"><input className="input-field" value={numInputs.elevation_m ?? hazard.elevation_m ?? ""} onChange={e => handleNum("elevation_m", e.target.value, setH)} /></QField>
                 <QField label="A3.3 Dist. to Water (m)" sub="Low(>500) ; Mod(200-500) ; High(<200)"><input className="input-field" value={numInputs.distance_to_water_m ?? hazard.distance_to_water_m ?? ""} onChange={e => handleNum("distance_to_water_m", e.target.value, setH)} /></QField>
-                <QField label="A3.4 Surface" sub="Low(Grass) ; Mod(Clay) ; High(Concrete)"><QualitativeSelect value={hazard.surface_runoff ?? ""} options={["Soil","Grass","Grass/Soil","Grass/Concrete","Concrete"]} onChange={v => setH("surface_runoff",v)} /></QField>
+                <QField label="A3.4 Surface" sub="Low(Lawn/Grass) ; Mod(Clay) ; High(Concrete/Asphalt/Brick)"><QualitativeSelect multiple value={hazard.surface_runoff ?? []} options={["Lawn","Grass","Clay","Concrete", "Asphalt", "Brick"]} onChange={v => setH("surface_runoff", v)} /></QField>
                 <QField label="A3.5 Base Height" sub="Low(Higher) ; Mod(Same) ; High(Lower)"><QualitativeSelect value={hazard.base_height ?? ""} options={["Base is higher","Same Level","Base is lower"]} onChange={v => setH("base_height",v)} /></QField>
                 <QField label="A3.6 Drainage" sub="Low(Maint.) ; Mod(Seldom) ; High(No)"><QualitativeSelect value={hazard.drainage_system ?? ""} options={["Closed drainage system","Open drainage system","No Drainage System"]} onChange={v => setH("drainage_system",v)} /></QField>
               </Section>
@@ -450,7 +559,7 @@ export default function QuestionnairePage() {
               <Section title="B2 — Historical Value">
                 <QField label="B2.1 Age of Building" sub="Low (50-75) ; Moderate (76 to 125) ; High (126+ years)">
                   <div className="text-sm font-bold text-terracotta bg-sand px-3 py-2 rounded-lg border border-bark/20 inline-block">
-                    {2024 - Number(building.year_built ?? 2024)} years old
+                    {currentYear - Number(building.year_built ?? currentYear)} years old
                   </div>
                 </QField>
                 <QField label="B2.2 Relevance" sub="past is relevant as I am able to identify with the culture and history."><SurveySelect value={exposure.b22!} onChange={v => setE("b22", v)} /></QField>
@@ -483,17 +592,17 @@ export default function QuestionnairePage() {
               
               <Section title="C1 — Structural System">
                 <QField label="C1.1 Code Year Built" sub="Low (1992+) ; Moderate (1972-1991) ; High (Pre-1972)"><QualitativeSelect value={vuln.building_code ?? ""} options={["New Code (1992-present)","Post-Code (1972-1991)","Pre-Code (before 1972)"]} onChange={v => setV("building_code",v)} /></QField>
-                <QField label="C1.2 Plan Irregularity" sub="Low (Regular) ; Moderate (Symmetric T,U,C) ; High (L-shaped)"><QualitativeSelect value={vuln.plan_irregularity ?? ""} options={["Rectangular", "Square", "T- shaped", "Irregular Shaped", "L-shaped"]} onChange={v => setV("plan_irregularity",v)} /></QField>
+                <QField label="C1.2 Plan Irregularity" sub="Low (Regular) ; Moderate (Symmetric T,U,C) ; High (L-shaped)"><QualitativeSelect multiple value={vuln.plan_irregularity ?? []} options={["Rectangular", "Square", "T- shaped", "Irregular Shaped", "L-shaped"]} onChange={v => setV("plan_irregularity",v)} /></QField>
                 <QField label="C1.3 Vertical Irregularity" sub="Low (None) ; Moderate (1) ; High (2+)"><QualitativeSelect value={vuln.vertical_irregularity ?? ""} options={["No vertical irregularity", "1 Vertical Irregularity", "2 Vertical Irregularities"]} onChange={v => setV("vertical_irregularity",v)} /></QField>
                 <QField label="C1.4 Proximity / Pounding" sub="Low (No adjacent) ; Moderate (>6 inches) ; High (<6 inches)"><QualitativeSelect value={vuln.building_proximity ?? ""} options={["No adjacent buildings", "6 inches and above", "below 6 inches"]} onChange={v => setV("building_proximity",v)} /></QField>
                 <QField label="C1.5 Number of Storeys" sub="Low (1) ; Moderate (2) ; High (3+)"><input className="input-field" value={numInputs.number_of_stories ?? vuln.number_of_stories ?? ""} onChange={e => handleNum("number_of_stories", e.target.value, setV)} /></QField>
-                <QField label="C1.6 System Material" sub="Low (Timber/LS) ; Moderate (RC/Steel) ; High (URM)"><QualitativeSelect value={vuln.structural_material ?? ""} options={["Timber Frame","Light Steel Frame","Reinforced Concrete","Steel","Unreinforced Masonry"]} onChange={v => setV("structural_material",v)} /></QField>
+                <QField label="C1.6 System Material" sub="Low (Timber/LS) ; Moderate (RC/Steel) ; High (URM)"><QualitativeSelect multiple value={vuln.structural_material ?? []} options={["Timber Frame","Light Steel Frame","Reinforced Concrete","Steel","Unreinforced Masonry"]} onChange={v => setV("structural_material",v)} /></QField>
                 <QField label="C1.7 Number of Bays" sub="Low (5+) ; Moderate (3-4) ; High (<3)"><input className="input-field" value={numInputs.number_of_bays ?? vuln.number_of_bays ?? ""} onChange={e => handleNum("number_of_bays", e.target.value, setV)} /></QField>
                 <QField label="C1.8 Column Spacing (m)" sub="Low (<3m) ; Moderate (3-5m) ; High (>5m)"><input className="input-field" value={numInputs.column_spacing_m ?? vuln.column_spacing_m ?? ""} onChange={e => handleNum("column_spacing_m", e.target.value, setV)} /></QField>
-                <QField label="C1.9 Building Enclosure" sub="Low (Enclosed) ; Moderate (Partial) ; High (Open)"><QualitativeSelect value={vuln.building_enclosure ?? ""} options={["Enclosed", "Partially Open", "Open"]} onChange={v => setV("building_enclosure",v)} /></QField>
-                <QField label="C1.10 Wall Material" sub="Low (RC) ; Moderate (RM) ; High (URM/Wood/Glass)"><QualitativeSelect value={vuln.wall_material ?? ""} options={["Reinforced Concrete", "Reinforced Masonry", "Unreinforced Masonry", "Wood", "Bamboo", "Glass", "Masonry"]} onChange={v => setV("wall_material",v)} /></QField>
-                <QField label="C1.11 Framing Type" sub="Low (Braced/SMRF) ; Moderate (Shearwall) ; High (Ordinary)"><QualitativeSelect value={vuln.structural_framing_type ?? ""} options={["Braced","Special Moment-Resisting Frame","Shearwall","Ordinary Frame"]} onChange={v => setV("structural_framing_type",v)} /></QField>
-                <QField label="C1.12 Flooring Material" sub="Low (Tiles/RC) ; Moderate (Hardwood/Bamboo) ; High (Mud)"><QualitativeSelect value={vuln.flooring_material ?? ""} options={["Concrete", "Tiles", "Hardwood", "Bamboo", "Earth Mud"]} onChange={v => setV("flooring_material",v)} /></QField>
+                <QField label="C1.9 Building Enclosure" sub="Low (Enclosed) ; Moderate (Partial) ; High (Open)"><QualitativeSelect multiple value={vuln.building_enclosure ?? []} options={["Enclosed", "Partially Open", "Open"]} onChange={v => setV("building_enclosure",v)} /></QField>
+                <QField label="C1.10 Wall Material" sub="Low (RC) ; Moderate (RM) ; High (URM/Wood/Glass)"><QualitativeSelect multiple value={vuln.wall_material ?? []} options={["Reinforced Concrete", "Reinforced Masonry", "Unreinforced Masonry", "Wood", "Bamboo", "Glass", "Masonry"]} onChange={v => setV("wall_material",v)} /></QField>
+                <QField label="C1.11 Framing Type" sub="Low (Braced/SMRF) ; Moderate (Shearwall) ; High (Ordinary)"><QualitativeSelect multiple value={vuln.structural_framing_type ?? []} options={["Braced","Special Moment-Resisting Frame","Shearwall","Ordinary Frame"]} onChange={v => setV("structural_framing_type",v)} /></QField>
+                <QField label="C1.12 Flooring Material" sub="Low (Tiles/RC) ; Moderate (Hardwood/Bamboo) ; High (Mud)"><QualitativeSelect multiple value={vuln.flooring_material ?? []} options={["Concrete", "Tiles", "Hardwood", "Bamboo", "Earth Mud"]} onChange={v => setV("flooring_material",v)} /></QField>
               </Section>
 
               <Section title="C2 — Building Condition">
@@ -520,10 +629,10 @@ export default function QuestionnairePage() {
               </Section>
 
               <Section title="C3 & C4 — Roof & Fasteners">
-                <QField label="C3.1 Roof Design" sub="Low (Hip) ; Moderate (Dutch/Gable) ; High (Monoslope)"><QualitativeSelect value={vuln.roof_design ?? ""} options={["Hip","Dutch Hip","Gable","Cross Hip Roof","Monoslope"]} onChange={v => setV("roof_design",v)} /></QField>
+                <QField label="C3.1 Roof Design" sub="Low (Hip) ; Moderate (Dutch/Gable) ; High (Monoslope)"><QualitativeSelect multiple value={vuln.roof_design ?? []} options={["Hip","Dutch Hip","Gable","Cross Hip Roof","Monoslope"]} onChange={v => setV("roof_design",v)} /></QField>
                 <QField label="C3.2 Roof Slope" sub="Low (30-45°) ; Moderate (>45°) ; High (<30°)"><QualitativeSelect value={vuln.roof_slope ?? ""} options={["30 to 45 degrees", "above 45 degrees", "below 30 degrees"]} onChange={v => setV("roof_slope",v)} /></QField>
-                <QField label="C3.3 Roofing Material" sub="Low (Tiles/RC) ; Moderate (GI/Metal) ; High (Wood/Thatch)"><QualitativeSelect value={vuln.roofing_material ?? ""} options={["Tiles", "Concrete", "Galvanized Iron Sheets", "Metals", "Asphalt Shingles", "Wood", "Thatch", "Shingles"]} onChange={v => setV("roofing_material",v)} /></QField>
-                <QField label="C4.1 Roof Fasteners" sub="Low (Screw) ; Moderate (Nails) ; High (Staples)"><QualitativeSelect value={vuln.roof_fastener ?? ""} options={["Metal Screw", "Nails", "Staples", "Hazel Spars"]} onChange={v => setV("roof_fastener",v)} /></QField>
+                <QField label="C3.3 Roofing Material" sub="Low (Tiles/RC) ; Moderate (GI/Metal) ; High (Wood/Thatch)"><QualitativeSelect multiple value={vuln.roofing_material ?? []} options={["Tiles", "Concrete", "Galvanized Iron Sheets", "Metals", "Asphalt Shingles", "Wood", "Thatch", "Shingles"]} onChange={v => setV("roofing_material",v)} /></QField>
+                <QField label="C4.1 Roof Fasteners" sub="Low (Screw) ; Moderate (Nails) ; High (Staples)"><QualitativeSelect multiple value={vuln.roof_fastener ?? []} options={["Metal Screw", "Nails", "Staples", "Hazel Spars"]} onChange={v => setV("roof_fastener",v)} /></QField>
                 <QField label="C4.2 Fastener Spacing (mm)" sub="Low (<225) ; Moderate (226-450) ; High (>450)"><input className="input-field" value={numInputs.roof_fastener_distance_mm ?? vuln.roof_fastener_distance_mm ?? ""} onChange={e => handleNum("roof_fastener_distance_mm", e.target.value, setV)} /></QField>
               </Section>
 
