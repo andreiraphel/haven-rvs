@@ -487,6 +487,18 @@ export default function QuestionnairePage() {
   const stepIdx = STEPS.findIndex(s => s.key === step);
   const riskColor = result ? result.risk_description === "LOW RISK" ? "text-[var(--risk-low)] bg-[var(--risk-low-bg)] border-[#b7e4cb]" : result.risk_description === "MODERATE RISK" ? "text-[var(--risk-mod)] bg-[var(--risk-mod-bg)] border-[#ffe0a0]" : "text-[var(--risk-high)] bg-[var(--risk-high-bg)] border-[#f5b8b8]" : "";
 
+  if (loading && !result && isEditing) {
+    return (
+      <>
+        <Topbar />
+        <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8 flex flex-col items-center justify-center min-h-[50vh]">
+          <div className="animate-spin h-8 w-8 border-4 border-terracotta border-t-transparent rounded-full mb-4"></div>
+          <p className="text-[var(--ink-lt)] font-medium">Loading assessment data...</p>
+        </main>
+      </>
+    );
+  }
+
   return (
     <>
       <Topbar />
