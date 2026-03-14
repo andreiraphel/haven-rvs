@@ -307,24 +307,30 @@ export default function QuestionnairePage() {
 
         const { data: { session } } = await sb.auth.getSession();
         console.log("💾 Saving Building to Supabase...");
-        const buildingRes = await fetch("/api/buildings", {
-          method: "POST",
+        
+        const buildingEndpoint = "/api/buildings";
+        const buildingMethod = isEditing ? "PUT" : "POST";
+        const buildingPayload = isEditing ? { ...building, id: buildingId, created_by: user.id } : { ...building, created_by: user.id };
+
+        const buildingRes = await fetch(buildingEndpoint, {
+          method: buildingMethod,
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
-          body: JSON.stringify({ ...building, created_by: user.id }),
+          body: JSON.stringify(buildingPayload),
         });
         if (!buildingRes.ok) throw new Error("Failed to save building");
         const savedBuilding = await buildingRes.json();
-        console.log("✅ Building Saved:", savedBuilding.id);
+        const activeBuildingId = savedBuilding.id;
+        console.log("✅ Building Saved:", activeBuildingId);
 
         await sb.from("questionnaire_responses").insert({
-          building_id: savedBuilding.id, step: "final_submission",
+          building_id: activeBuildingId, step: "final_submission",
           response: { building, hazard, vulnerability: vuln, exposure }
         });
 
         // Calculate b21 based on age
         const age = currentYear - Number(building.year_built ?? currentYear);
         const b21 = age <= 75 ? 1 : age <= 125 ? 2 : 3;
-        const finalExposure = { ...exposure, b21, building_id: savedBuilding.id };
+        const finalExposure = { ...exposure, b21, building_id: activeBuildingId };
 
         // Process multi-select fields for ML prediction and Gemini API
         const getHighestValue = (value: string | string[] | undefined, map: Record<string, number>): string | undefined => {
@@ -384,11 +390,22 @@ export default function QuestionnairePage() {
 
         // 3. Save all indicators
         console.log("📊 Saving Indicators...");
-        const [hRes, vRes, eRes] = await Promise.all([
-          sb.from("hazard_indicators").insert({ ...hazard, building_id: savedBuilding.id }),
-          sb.from("vulnerability_indicators").insert({ ...vuln, building_id: savedBuilding.id }),
-          sb.from("exposure_indicators").insert(finalExposure)
-        ]);
+        
+        let hRes, vRes, eRes;
+
+        if (isEditing) {
+          [hRes, vRes, eRes] = await Promise.all([
+            sb.from("hazard_indicators").update({ ...hazard }).eq("building_id", activeBuildingId),
+            sb.from("vulnerability_indicators").update({ ...vuln }).eq("building_id", activeBuildingId),
+            sb.from("exposure_indicators").update(finalExposure).eq("building_id", activeBuildingId)
+          ]);
+        } else {
+          [hRes, vRes, eRes] = await Promise.all([
+            sb.from("hazard_indicators").insert({ ...hazard, building_id: activeBuildingId }),
+            sb.from("vulnerability_indicators").insert({ ...vuln, building_id: activeBuildingId }),
+            sb.from("exposure_indicators").insert(finalExposure)
+          ]);
+        }
 
         if (hRes.error) throw new Error(`Hazard data failed: ${hRes.error.message}`);
         if (vRes.error) throw new Error(`Vulnerability data failed: ${vRes.error.message}`);
