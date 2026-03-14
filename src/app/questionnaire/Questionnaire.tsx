@@ -455,8 +455,9 @@ export default function QuestionnairePage() {
         else finalDesc = "HIGH RISK";
 
         console.log("🏁 Finalizing Result...");
-        const { error: rErr } = await sb.from("risk_results").insert({
-          building_id: savedBuilding.id,
+        
+        let rErr;
+        const resultPayload = {
           risk_index: primaryIndex,
           risk_description: finalDesc,
           hazard_rating: manualResult.hazard_rating,
@@ -468,13 +469,21 @@ export default function QuestionnairePage() {
           narrative: aiNarrative,
           ai_course_of_action: aiCOA,
           assessed_by: user.id,
-        });
+        };
+
+        if (isEditing) {
+           const { error } = await sb.from("risk_results").update(resultPayload).eq("building_id", activeBuildingId);
+           rErr = error;
+        } else {
+           const { error } = await sb.from("risk_results").insert({ ...resultPayload, building_id: activeBuildingId });
+           rErr = error;
+        }
 
         if (rErr) throw new Error(`Risk result failed: ${rErr.message}`);
 
         setResult({
           ...manualResult,
-          building_id: savedBuilding.id,
+          building_id: activeBuildingId,
           risk_index: primaryIndex,
           risk_description: finalDesc,
           ml_prediction: mlPred,
