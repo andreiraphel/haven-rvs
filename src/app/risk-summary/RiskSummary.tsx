@@ -86,6 +86,8 @@ export default function RiskSummaryPage() {
     setExporting("");
   }
 
+  const router = useRouter();
+
   return (
     <>
       <Topbar />
@@ -225,12 +227,14 @@ export default function RiskSummaryPage() {
         </div>
       </main>
 
-      {selected && <DetailModal assessment={selected} onClose={() => setSelected(null)} />}
+      {selected && <DetailModal assessment={selected} onClose={() => setSelected(null)} router={router} />}
     </>
   );
 }
 
-function DetailModal({ assessment: a, onClose }: { assessment: Assessment; onClose: () => void }) {
+import { useRouter } from "next/navigation";
+
+function DetailModal({ assessment: a, onClose, router }: { assessment: Assessment; onClose: () => void; router: any }) {
   const rc = a.result.risk_description;
   const riskCls =
     rc === "LOW RISK"      ? "bg-[var(--risk-low-bg)] border-[#b7e4cb] text-[var(--risk-low)]"
@@ -242,7 +246,10 @@ function DetailModal({ assessment: a, onClose }: { assessment: Assessment; onClo
   return (
     <Modal open onClose={onClose} title={a.building.name} wide
       footer={
-        <button className="btn-secondary" onClick={onClose}>Close</button>
+        <div className="flex gap-3 w-full sm:w-auto">
+          <button className="btn-secondary flex-1 sm:flex-none" onClick={onClose}>Close</button>
+          <button className="btn-primary flex-1 sm:flex-none" onClick={() => router.push(`/questionnaire?editId=${a.building.id}`)}>Edit Assessment</button>
+        </div>
       }
     >
       {/* 1. Quick Info Grid */}
@@ -365,25 +372,33 @@ function DetailModal({ assessment: a, onClose }: { assessment: Assessment; onClo
             <DataRow label="Liquefaction Susceptibility" val={a.hazard.potential_liquefaction} />
             <DataRow label="Basic Wind Speed" val={`${a.hazard.basic_wind_speed_kph} kph`} />
             <DataRow label="Terrain" val={a.hazard.terrain} />
+            <DataRow label="Slope" val={a.hazard.slope_degrees} />
             <DataRow label="Elevation" val={`${a.hazard.elevation_m} m`} />
             <DataRow label="Distance to Water" val={`${a.hazard.distance_to_water_m} m`} />
             <DataRow label="Water Body Name" val={a.hazard.water_body_name} />
+            <DataRow label="Surface Runoff" val={Array.isArray(a.hazard.surface_runoff) ? a.hazard.surface_runoff.join(', ') : a.hazard.surface_runoff} />
+            <DataRow label="Base Height" val={a.hazard.base_height} />
+            <DataRow label="Drainage System" val={a.hazard.drainage_system} />
           </div>
         </Section>
 
         <Section title="Vulnerability & Structural (C1-C4)">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
             <DataRow label="Building Code Era" val={a.vulnerability.building_code} />
-            <DataRow label="Structural Material" val={a.vulnerability.structural_material} />
-            <DataRow label="Framing Type" val={a.vulnerability.structural_framing_type} />
-            <DataRow label="Plan Irregularity" val={a.vulnerability.plan_irregularity} />
+            <DataRow label="Structural Material" val={Array.isArray(a.vulnerability.structural_material) ? a.vulnerability.structural_material.join(', ') : a.vulnerability.structural_material} />
+            <DataRow label="Framing Type" val={Array.isArray(a.vulnerability.structural_framing_type) ? a.vulnerability.structural_framing_type.join(', ') : a.vulnerability.structural_framing_type} />
+            <DataRow label="Plan Irregularity" val={Array.isArray(a.vulnerability.plan_irregularity) ? a.vulnerability.plan_irregularity.join(', ') : a.vulnerability.plan_irregularity} />
             <DataRow label="Vertical Irregularity" val={a.vulnerability.vertical_irregularity} />
             <DataRow label="Building Proximity" val={a.vulnerability.building_proximity} />
+            <DataRow label="Building Enclosure" val={Array.isArray(a.vulnerability.building_enclosure) ? a.vulnerability.building_enclosure.join(', ') : a.vulnerability.building_enclosure} />
             <DataRow label="Number of Bays" val={a.vulnerability.number_of_bays} />
             <DataRow label="Column Spacing" val={`${a.vulnerability.column_spacing_m} m`} />
-            <DataRow label="Wall Material" val={a.vulnerability.wall_material} />
-            <DataRow label="Roof Design" val={a.vulnerability.roof_design} />
-            <DataRow label="Roof Fastener" val={a.vulnerability.roof_fastener} />
+            <DataRow label="Wall Material" val={Array.isArray(a.vulnerability.wall_material) ? a.vulnerability.wall_material.join(', ') : a.vulnerability.wall_material} />
+            <DataRow label="Flooring Material" val={Array.isArray(a.vulnerability.flooring_material) ? a.vulnerability.flooring_material.join(', ') : a.vulnerability.flooring_material} />
+            <DataRow label="Roof Design" val={Array.isArray(a.vulnerability.roof_design) ? a.vulnerability.roof_design.join(', ') : a.vulnerability.roof_design} />
+            <DataRow label="Roof Material" val={Array.isArray(a.vulnerability.roofing_material) ? a.vulnerability.roofing_material.join(', ') : a.vulnerability.roofing_material} />
+            <DataRow label="Roof Slope" val={a.vulnerability.roof_slope} />
+            <DataRow label="Roof Fastener" val={Array.isArray(a.vulnerability.roof_fastener) ? a.vulnerability.roof_fastener.join(', ') : a.vulnerability.roof_fastener} />
             <DataRow label="Fastener Spacing" val={`${a.vulnerability.roof_fastener_distance_mm} mm`} />
           </div>
         </Section>
@@ -396,6 +411,28 @@ function DetailModal({ assessment: a, onClose }: { assessment: Assessment; onClo
             <DataRow label="Finishing Condition" val={a.vulnerability.finishing_condition ? "Yes" : "No"} />
             <DataRow label="Decay of Structural Members" val={a.vulnerability.decay_of_structural_member ? "Yes" : "No"} />
             <DataRow label="Additional Loads" val={a.vulnerability.additional_loads ? "Yes" : "No"} />
+          </div>
+        </Section>
+
+        <Section title="Value Assessment (Exposure)">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <DataRow label="B1.1 Theme & Proportion" val={a.exposure.b11} />
+            <DataRow label="B1.2 Uniqueness" val={a.exposure.b12} />
+            <DataRow label="B1.3 Typical Style" val={a.exposure.b13} />
+            <DataRow label="B1.4 Integration" val={a.exposure.b14} />
+            <DataRow label="B2.1 Age Score" val={a.exposure.b21} />
+            <DataRow label="B2.2 Relevance" val={a.exposure.b22} />
+            <DataRow label="B2.3 Geographic Impact" val={a.exposure.b23} />
+            <DataRow label="B2.4 Heritage Tie" val={a.exposure.b24} />
+            <DataRow label="B2.5 Important Message" val={a.exposure.b25} />
+            <DataRow label="B3.1 Promotion" val={a.exposure.b31} />
+            <DataRow label="B3.2 Suggestions" val={a.exposure.b32} />
+            <DataRow label="B3.3 Importance" val={a.exposure.b33} />
+            <DataRow label="B3.4 No Efforts (Inverted)" val={a.exposure.b34} />
+            <DataRow label="B4.1 Tourist Attraction" val={a.exposure.b41} />
+            <DataRow label="B4.2 Tourism Contrib." val={a.exposure.b42} />
+            <DataRow label="B4.3 Goods & Services" val={a.exposure.b43} />
+            <DataRow label="B4.4 Adaptive Use" val={a.exposure.b44} />
           </div>
         </Section>
       </div>
