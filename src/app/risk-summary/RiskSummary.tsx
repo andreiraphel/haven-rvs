@@ -222,16 +222,103 @@ export default function RiskSummaryPage() {
 
         {/* Export buttons */}
         <div className="flex flex-col sm:flex-row gap-3 mt-6">
-          <button onClick={handleExcel} disabled={exporting === "xlsx" || loading} className="btn-secondary w-full sm:w-auto py-3">
-            {exporting === "xlsx" ? "Exporting…" : "⬇ Export Excel (.xlsx)"}
-          </button>
-          <button onClick={handlePDF} disabled={exporting === "pdf" || loading} className="btn-secondary w-full sm:w-auto py-3">
-            {exporting === "pdf" ? "Exporting…" : "📄 Export PDF"}
+          <button onClick={() => setShowExportModal(true)} disabled={loading || sorted.length === 0} className="btn-secondary w-full sm:w-auto py-3">
+            ⇪ Export Options
           </button>
         </div>
       </main>
 
       {selected && <DetailModal assessment={selected} onClose={() => setSelected(null)} router={router} />}
+
+      <Modal open={showExportModal} onClose={() => setShowExportModal(false)} title="Export Reports">
+        <div className="space-y-6">
+          {/* Format Selection */}
+          <div>
+            <div className="label-sm mb-3">1. Select Format</div>
+            <div className="grid grid-cols-2 gap-3">
+              <button 
+                onClick={() => setExportFormat("xlsx")}
+                className={`p-4 border rounded-xl flex flex-col items-center gap-2 transition-all ${
+                  exportFormat === "xlsx" ? "border-terracotta bg-terracotta/5 ring-1 ring-terracotta" : "border-[var(--border)] hover:bg-sand"
+                }`}
+              >
+                <span className="text-2xl">📊</span>
+                <span className={`font-semibold text-sm ${exportFormat === "xlsx" ? "text-terracotta" : "text-ink"}`}>Excel (.xlsx)</span>
+              </button>
+              <button 
+                onClick={() => setExportFormat("pdf")}
+                className={`p-4 border rounded-xl flex flex-col items-center gap-2 transition-all ${
+                  exportFormat === "pdf" ? "border-terracotta bg-terracotta/5 ring-1 ring-terracotta" : "border-[var(--border)] hover:bg-sand"
+                }`}
+              >
+                <span className="text-2xl">📄</span>
+                <span className={`font-semibold text-sm ${exportFormat === "pdf" ? "text-terracotta" : "text-ink"}`}>PDF Document</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Records Selection */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <div className="label-sm">2. Select Records</div>
+              <button onClick={() => {
+                if (selectedForExport.size === sorted.length) setSelectedForExport(new Set());
+                else setSelectedForExport(new Set(sorted.map(a => a.building.id)));
+              }} className="text-xs text-terracotta hover:underline font-semibold">
+                {selectedForExport.size === sorted.length ? "Deselect All" : "Select All"}
+              </button>
+            </div>
+            
+            <div className="border border-[var(--border)] rounded-xl max-h-[200px] overflow-y-auto bg-sand p-2">
+              {sorted.map(a => (
+                <label key={a.building.id} className="flex items-center gap-3 p-2 hover:bg-white rounded-lg cursor-pointer transition-colors">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 rounded border-[var(--border)] text-terracotta focus:ring-terracotta accent-terracotta"
+                    checked={selectedForExport.has(a.building.id)}
+                    onChange={() => {
+                      const next = new Set(selectedForExport);
+                      if (next.has(a.building.id)) next.delete(a.building.id);
+                      else next.add(a.building.id);
+                      setSelectedForExport(next);
+                    }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-ink truncate">{a.building.name}</div>
+                    <div className="text-xs text-[var(--ink-lt)] truncate">{a.building.unique_code} • {a.building.municipality}</div>
+                  </div>
+                  <RiskBadge level={a.result.risk_description} showDot={false} />
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-[var(--ink-lt)] mt-2 italic">
+              {selectedForExport.size === 0 ? "No records selected (will export ALL by default)" : `${selectedForExport.size} records selected`}
+            </p>
+          </div>
+          
+          <button 
+            onClick={async () => {
+              const toExport = selectedForExport.size === 0 
+                ? sorted 
+                : sorted.filter(a => selectedForExport.has(a.building.id));
+          
+              setExporting(exportFormat);
+              try {
+                if (exportFormat === "xlsx") await exportToExcel(toExport);
+                else await exportToPDF(toExport);
+              } catch (err) {
+                console.error("Export failed", err);
+              }
+              setExporting("");
+              setShowExportModal(false);
+            }} 
+            disabled={!!exporting}
+            className="btn-primary w-full py-3 mt-4"
+          >
+            {exporting ? "Exporting..." : `Download ${exportFormat.toUpperCase()}`}
+          </button>
+        </div>
+      </Modal>
     </>
   );
 }
