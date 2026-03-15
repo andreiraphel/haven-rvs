@@ -130,6 +130,7 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
   const [isStubFilled, setIsStubFilled] = useState(false);
   const [result, setResult]   = useState<RiskResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [computeStatus, setComputeStatus] = useState<string | null>(null);
   const [error, setError]     = useState<string | null>(null);
 
   const [numInputs, setNumInputs] = useState<Record<string, string>>({});
@@ -548,12 +549,15 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
       } catch (err: any) {
         console.error("❌ CRITICAL ERROR in computeAndShow:", err);
         setError(err.message);
-      } finally { setLoading(false); }
+      } finally { 
+        setLoading(false);
+        setComputeStatus(null);
+      }
     }
   const stepIdx = STEPS.findIndex(s => s.key === step);
   const riskColor = result ? result.risk_description === "LOW RISK" ? "text-[var(--risk-low)] bg-[var(--risk-low-bg)] border-[#b7e4cb]" : result.risk_description === "MODERATE RISK" ? "text-[var(--risk-mod)] bg-[var(--risk-mod-bg)] border-[#ffe0a0]" : "text-[var(--risk-high)] bg-[var(--risk-high-bg)] border-[#f5b8b8]" : "";
 
-  if (loading && !result && isEditing) {
+  if (loading && !result && isEditing && !computeStatus) {
     return (
       <>
         <Topbar />
@@ -753,6 +757,19 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
           )}
         </div>
       </main>
+
+      {computeStatus && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/60 backdrop-blur-md transition-all">
+          <div className="bg-white p-8 rounded-2xl shadow-2xl border border-sand max-w-sm w-full text-center flex flex-col items-center">
+            <div className="relative w-16 h-16 mb-6">
+              <div className="absolute inset-0 border-4 border-sand rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-terracotta rounded-full border-t-transparent animate-spin"></div>
+            </div>
+            <h3 className="font-sora font-bold text-xl text-ink mb-2">Analyzing Structure</h3>
+            <p className="text-sm text-[var(--ink-lt)] animate-pulse">{computeStatus}</p>
+          </div>
+        </div>
+      )}
     </>
   );
 }
