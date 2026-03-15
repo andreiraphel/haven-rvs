@@ -21,7 +21,6 @@ const SORTS: { key: SortKey; label: string }[] = [
 export default function RiskSummaryPage() {
   const [sort, setSort]           = useState<SortKey>("default");
   const [selected, setSelected]   = useState<Assessment | null>(null);
-  const [exporting, setExporting] = useState<"" | "xlsx" | "pdf">("");
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [loading, setLoading]     = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -29,6 +28,7 @@ export default function RiskSummaryPage() {
 
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState<"xlsx" | "pdf">("xlsx");
+  const [exporting, setExporting] = useState<"" | "xlsx" | "pdf">("");
   const [selectedForExport, setSelectedForExport] = useState<Set<string>>(new Set());
 
   // ── Fetch real data from Supabase ─────────────────────────────────────────
