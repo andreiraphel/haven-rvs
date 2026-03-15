@@ -204,10 +204,11 @@ function BuildingModal({ assessment: a, onClose }: { assessment: CombinedData; o
   return (
     <Modal open onClose={onClose} title={a.building.name} wide
       footer={
-        <>
+        <div className="flex gap-3 w-full sm:w-auto">
           <button className="btn-secondary" onClick={onClose}>Close</button>
+          <Link href={`/edit-assessment/${a.building.id}`} className="btn-secondary text-xs px-4 py-2">Edit Assessment</Link>
           <Link href="/risk-summary" className="btn-primary text-xs px-4 py-2">View Full Summary →</Link>
-        </>
+        </div>
       }
     >
       {/* 1. Quick Info Grid */}
