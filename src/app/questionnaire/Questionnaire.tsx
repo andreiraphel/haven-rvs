@@ -312,7 +312,9 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
 
   async function computeAndShow() {
       console.log("🚀 START: Compute Index Pressed");
-      setLoading(true); setError(null);
+      setLoading(true);
+      setComputeStatus("Initializing calculation...");
+      setError(null);
       try {
         const sb = getSupabase();
         const { data: { user } } = await sb.auth.getUser();
@@ -323,6 +325,7 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
         console.log("👤 User authenticated:", user.id);
 
         // Manual Computation
+        setComputeStatus("Running manual risk index formulas...");
         console.log("🔢 Running Manual Computation...");
         const manualResult = calculateAssessmentRisk(
           hazard as HazardIndicators,
@@ -333,6 +336,7 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
         );
         console.log("✅ Manual Result:", manualResult);
 
+        setComputeStatus("Saving building configuration...");
         const { data: { session } } = await sb.auth.getSession();
         console.log("💾 Saving Building to Supabase...");
         
@@ -392,6 +396,7 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
         processedVuln.roofing_material = getHighestValue(vuln.roofing_material, ROOF_MAT_MAP);
         processedVuln.roof_fastener = getHighestValue(vuln.roof_fastener, FAST_TYPE_MAP);
 
+        setComputeStatus("Executing Dual-Engine ML Prediction...");
         // Fetch ML Prediction
         console.log("🤖 Calling ML API /api/predict...");
         let mlPred = 0;
@@ -417,6 +422,7 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
         } catch (mlErr) { console.error("❌ ML Prediction API call crashed:", mlErr); }
 
         // 3. Save all indicators
+        setComputeStatus("Saving structural indicators...");
         console.log("📊 Saving Indicators...");
         
         let hRes, vRes, eRes;
@@ -471,6 +477,7 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
         console.log("✅ Indicators Saved");
 
         // 4. Generate AI Narrative & COA
+        setComputeStatus("Generating AI Narrative & Course of Action...");
         console.log("🧠 Calling Gemini AI /api/gemini...");
         let aiNarrative = ""; let aiCOA = "";
         try {
@@ -499,6 +506,7 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
         if (!aiCOA) aiCOA = "1. Structural audit\n2. Connection check\n3. Decay check\n4. Disaster plan";
 
         // 5. Finalize Result (ML is primary, Manual is fallback/support)
+        setComputeStatus("Finalizing Risk Assessment...");
         const primaryIndex = mlPred > 0 ? mlPred : manualResult.risk_index;
 
         // Determine description based on the Primary (ML) Index
