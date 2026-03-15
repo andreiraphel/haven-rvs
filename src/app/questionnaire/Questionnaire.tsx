@@ -735,7 +735,7 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
                 <QField label="C4.2 Fastener Spacing (mm)" sub="Low (<225) ; Moderate (226-450) ; High (>450)"><input className="input-field" value={numInputs.roof_fastener_distance_mm ?? vuln.roof_fastener_distance_mm ?? ""} onChange={e => handleNum("roof_fastener_distance_mm", e.target.value, setV)} /></QField>
               </Section>
 
-              <div className="flex justify-between pt-2"><button className="btn-secondary" onClick={() => setStep("exposure")}>← Back</button><button className="btn-primary" onClick={computeAndShow} disabled={loading}>{loading ? "Computing…" : "Compute Index →"}</button></div>
+              <div className="flex justify-between pt-2"><button className="btn-secondary" onClick={() => setStep("exposure")}>← Back</button><button className="btn-primary" onClick={computeAndShow} disabled={loading}>Compute Index →</button></div>
             </div>
           )}
 
