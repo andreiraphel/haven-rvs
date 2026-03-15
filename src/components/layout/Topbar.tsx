@@ -86,8 +86,8 @@ export default function Topbar() {
                 + New Assessment
               </Link>
               <div className="flex flex-col items-end mr-2 text-right">
-                <span className="text-[10px] uppercase font-bold text-[var(--ink-lt)] opacity-60">Evaluator</span>
-                <span className="text-xs font-semibold text-ink max-w-[150px] truncate">{displayName}</span>
+                <span className="text-[10px] uppercase font-bold text-[var(--ink-lt)] opacity-60">{displayName}</span>
+                <span className="text-xs font-semibold text-ink max-w-[150px] truncate">{user.email}</span>
               </div>
               <div className="w-9 h-9 rounded-full bg-gradient-to-br from-terracotta to-sienna text-white text-sm font-bold font-sora flex items-center justify-center shadow-sm">
                 {initial}
@@ -126,8 +126,8 @@ export default function Topbar() {
                   {initial}
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-[10px] uppercase font-bold text-[var(--ink-lt)] opacity-60 leading-none mb-1">Evaluator</span>
-                  <span className="text-sm font-semibold text-ink truncate max-w-[200px]">{displayName}</span>
+                  <span className="text-[10px] uppercase font-bold text-[var(--ink-lt)] opacity-60 leading-none mb-1">{displayName}</span>
+                  <span className="text-sm font-semibold text-ink truncate max-w-[200px]">{user.email}</span>
                 </div>
               </div>
             )}
