@@ -248,27 +248,50 @@ function BuildingModal({ assessment: a, onClose }: { assessment: CombinedData; o
       <div className="min-h-[300px]">
         {activeTab === 'overview' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            {/* Risk Score Card */}
-            <div className={`rounded-xl border p-6 flex flex-col items-center text-center h-full justify-center ${riskCls}`}>
-              <div className="text-[10px] font-bold uppercase tracking-[0.2em] mb-2 opacity-70 text-current">Risk Index</div>
-              <div className="font-sora font-extrabold text-6xl leading-none mb-2">
+            {/* Left: Overall Risk Score */}
+            <div className={`rounded-xl border p-8 flex flex-col items-center text-center h-full justify-center ${riskCls}`}>
+              <div className="text-xs font-bold uppercase tracking-[0.2em] mb-4 opacity-70 text-current">Overall Risk Index</div>
+              <div className="font-sora font-extrabold text-7xl leading-none mb-6">
                 {a.result.risk_index?.toFixed(2) ?? "—"}
               </div>
-              <div className="text-sm font-bold uppercase tracking-widest">{rc}</div>
-              
-              <div className="w-full mt-6 space-y-3 pt-6 border-t border-current/20">
-                <div className="flex justify-between text-xs">
-                  <span className="opacity-70">Hazard</span>
-                  <span className="font-bold">{a.result.hazard_rating?.toFixed(3) ?? "—"}</span>
+              <div className="text-sm font-bold uppercase tracking-widest px-5 py-2 rounded-full bg-white/20 border border-current/10">
+                {rc}
+              </div>
+            </div>
+            
+            {/* Right: Component Breakdown */}
+            <div className="flex flex-col justify-center gap-4">
+              <div className="bg-sand p-5 rounded-xl border border-[var(--border)] flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-white border border-[var(--border)] flex items-center justify-center font-bold text-[var(--ink-lt)] shadow-sm">H</div>
+                  <div>
+                    <div className="font-semibold text-sm text-ink leading-none mb-1">Hazard</div>
+                    <div className="text-[10px] text-[var(--ink-lt)] uppercase tracking-wider">Rating</div>
+                  </div>
                 </div>
-                <div className="flex justify-between text-xs">
-                  <span className="opacity-70">Vulnerability</span>
-                  <span className="font-bold">{a.result.vulnerability_rating?.toFixed(3) ?? "—"}</span>
+                <span className="font-sora font-bold text-xl text-ink">{a.result.hazard_rating?.toFixed(3) ?? "—"}</span>
+              </div>
+
+              <div className="bg-sand p-5 rounded-xl border border-[var(--border)] flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-white border border-[var(--border)] flex items-center justify-center font-bold text-[var(--ink-lt)] shadow-sm">V</div>
+                  <div>
+                    <div className="font-semibold text-sm text-ink leading-none mb-1">Vulnerability</div>
+                    <div className="text-[10px] text-[var(--ink-lt)] uppercase tracking-wider">Rating</div>
+                  </div>
                 </div>
-                <div className="flex justify-between text-xs">
-                  <span className="opacity-70">Exposure</span>
-                  <span className="font-bold">{a.result.exposure_rating?.toFixed(3) ?? "—"}</span>
+                <span className="font-sora font-bold text-xl text-ink">{a.result.vulnerability_rating?.toFixed(3) ?? "—"}</span>
+              </div>
+
+              <div className="bg-sand p-5 rounded-xl border border-[var(--border)] flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-white border border-[var(--border)] flex items-center justify-center font-bold text-[var(--ink-lt)] shadow-sm">E</div>
+                  <div>
+                    <div className="font-semibold text-sm text-ink leading-none mb-1">Exposure</div>
+                    <div className="text-[10px] text-[var(--ink-lt)] uppercase tracking-wider">Rating</div>
+                  </div>
                 </div>
+                <span className="font-sora font-bold text-xl text-ink">{a.result.exposure_rating?.toFixed(3) ?? "—"}</span>
               </div>
             </div>
           </div>
