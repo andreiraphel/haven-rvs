@@ -27,6 +27,10 @@ export default function RiskSummaryPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFormat, setExportFormat] = useState<"xlsx" | "pdf">("xlsx");
+  const [selectedForExport, setSelectedForExport] = useState<Set<string>>(new Set());
+
   // ── Fetch real data from Supabase ─────────────────────────────────────────
   useEffect(() => {
     async function load() {

@@ -156,48 +156,50 @@ export async function exportToPDF(assessments: Assessment[]) {
 
   autoTable(doc, {
     startY: 32,
-    head: [["Building Name", "Code", "Town", "Risk Index (ML)", "Manual", "Level", "Hazard", "Vuln", "Exp"]],
+    head: [["Name / Code", "Details", "Risk", "Level", "H", "V", "E", "AI Summary"]],
     body: assessments.map(a => [
-      a.building.name,
-      a.building.unique_code,
-      a.building.municipality,
-      a.result.risk_index != null ? a.result.risk_index.toFixed(2) : "—",
-      a.result.manual_index != null ? a.result.manual_index.toFixed(2) : "—",
+      `${a.building.name}\n${a.building.unique_code}`,
+      `${a.building.municipality}\n${a.building.building_type} (${a.building.year_built})`,
+      `ML: ${a.result.risk_index != null ? a.result.risk_index.toFixed(2) : "—"}\nMan: ${a.result.manual_index != null ? a.result.manual_index.toFixed(2) : "—"}`,
       a.result.risk_description || "PENDING",
       a.result.hazard_rating != null ? a.result.hazard_rating.toFixed(2) : "—",
       a.result.vulnerability_rating != null ? a.result.vulnerability_rating.toFixed(2) : "—",
       a.result.exposure_rating != null ? a.result.exposure_rating.toFixed(2) : "—",
+      a.result.narrative ? a.result.narrative.substring(0, 100) + (a.result.narrative.length > 100 ? "..." : "") : "—"
     ]),
     headStyles: {
       fillColor: [61, 43, 31],
       textColor: 255,
       fontStyle: "bold",
       halign: "center",
-      fontSize: 9,
+      fontSize: 8,
     },
-    bodyStyles: { fontSize: 8, cellPadding: 3 },
+    bodyStyles: { fontSize: 7, cellPadding: 3, valign: "middle" },
     columnStyles: {
-      0: { cellWidth: 40 }, // Building Name
-      1: { cellWidth: 25 }, // Code
-      2: { cellWidth: 25 }, // Town
-      3: { halign: "center" },
-      4: { halign: "center" },
-      5: { halign: "center" },
+      0: { cellWidth: 40 }, // Name / Code
+      1: { cellWidth: 35 }, // Details
+      2: { cellWidth: 20, halign: "center" }, // Risk Index
+      3: { cellWidth: 25, halign: "center", fontStyle: "bold" }, // Level
+      4: { cellWidth: 10, halign: "center" }, // H
+      5: { cellWidth: 10, halign: "center" }, // V
+      6: { cellWidth: 10, halign: "center" }, // E
+      7: { cellWidth: 'auto' }, // AI Summary
     },
     didDrawCell: (data: any) => {
-      if (data.section === "body") {
+      if (data.section === "body" && data.column.index === 3) {
+        // Only color the "Level" column
         const risk = assessments[data.row.index]?.result.risk_description;
         if (risk && riskColors[risk]) {
           const [r, g, b] = riskColors[risk];
           doc.setFillColor(r, g, b);
           doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height, "F");
           doc.setTextColor(0);
-          doc.text(String(data.cell.raw), data.cell.x + 2, data.cell.y + data.cell.height / 2 + 1);
+          doc.text(String(data.cell.raw), data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2, { align: "center", baseline: "middle" });
         }
       }
     },
     alternateRowStyles: { fillColor: [250, 247, 242] },
-    margin: { left: 14, right: 14 },
+    margin: { left: 10, right: 10 },
   });
 
   doc.save(`HAVEN-RVS_Risk_Summary_${new Date().toISOString().slice(0, 10)}.pdf`);
