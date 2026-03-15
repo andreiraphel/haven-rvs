@@ -64,6 +64,7 @@ export async function POST(req: NextRequest) {
         }],
         generationConfig: {
           temperature: 0.2,
+          responseMimeType: "application/json",
         }
       })
     });
@@ -86,8 +87,8 @@ export async function POST(req: NextRequest) {
 
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-    // Clean and parse the generated AI response
-    let cleanText = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    // Clean and parse the generated AI response (safeguard just in case)
+    const cleanText = text.replace(/```json/gi, "").replace(/```/g, "").trim();
 
     try {
       const parsed = JSON.parse(cleanText);
