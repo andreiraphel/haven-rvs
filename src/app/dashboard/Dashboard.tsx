@@ -193,6 +193,8 @@ export default function DashboardPage() {
 }
 
 function BuildingModal({ assessment: a, onClose }: { assessment: CombinedData; onClose: () => void }) {
+  const [activeTab, setActiveTab] = useState<'overview' | 'ai' | 'actions'>('overview');
+
   const rc = a.result.risk_description;
   const riskCls =
     rc === "LOW RISK"      ? "bg-[var(--risk-low-bg)] border-[#b7e4cb] text-[var(--risk-low)]"
@@ -226,64 +228,92 @@ function BuildingModal({ assessment: a, onClose }: { assessment: CombinedData; o
         ))}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        {/* Left: Risk Score Card */}
-        <div className="md:col-span-1">
-          <div className={`rounded-xl border p-6 flex flex-col items-center text-center h-full justify-center ${riskCls}`}>
-            <div className="text-[10px] font-bold uppercase tracking-[0.2em] mb-2 opacity-70 text-current">Risk Index</div>
-            <div className="font-sora font-extrabold text-6xl leading-none mb-2">
-              {a.result.risk_index?.toFixed(2) ?? "—"}
-            </div>
-            <div className="text-sm font-bold uppercase tracking-widest">{rc}</div>
-            
-            <div className="w-full mt-6 space-y-3 pt-6 border-t border-current/20">
-              <div className="flex justify-between text-xs">
-                <span className="opacity-70">Hazard</span>
-                <span className="font-bold">{a.result.hazard_rating?.toFixed(3) ?? "—"}</span>
+      {/* Tabs */}
+      <div className="flex border-b border-[var(--border)] mb-6">
+        {(['overview', 'ai', 'actions'] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === tab
+                ? 'border-ink text-ink'
+                : 'border-transparent text-[var(--ink-lt)] hover:text-ink hover:border-[var(--border)]'
+            }`}
+          >
+            {tab === 'overview' ? 'Overview' : tab === 'ai' ? 'AI Analysis' : 'Action Plan'}
+          </button>
+        ))}
+      </div>
+
+      <div className="min-h-[300px]">
+        {activeTab === 'overview' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            {/* Risk Score Card */}
+            <div className={`rounded-xl border p-6 flex flex-col items-center text-center h-full justify-center ${riskCls}`}>
+              <div className="text-[10px] font-bold uppercase tracking-[0.2em] mb-2 opacity-70 text-current">Risk Index</div>
+              <div className="font-sora font-extrabold text-6xl leading-none mb-2">
+                {a.result.risk_index?.toFixed(2) ?? "—"}
               </div>
-              <div className="flex justify-between text-xs">
-                <span className="opacity-70">Vulnerability</span>
-                <span className="font-bold">{a.result.vulnerability_rating?.toFixed(3) ?? "—"}</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="opacity-70">Exposure</span>
-                <span className="font-bold">{a.result.exposure_rating?.toFixed(3) ?? "—"}</span>
+              <div className="text-sm font-bold uppercase tracking-widest">{rc}</div>
+              
+              <div className="w-full mt-6 space-y-3 pt-6 border-t border-current/20">
+                <div className="flex justify-between text-xs">
+                  <span className="opacity-70">Hazard</span>
+                  <span className="font-bold">{a.result.hazard_rating?.toFixed(3) ?? "—"}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="opacity-70">Vulnerability</span>
+                  <span className="font-bold">{a.result.vulnerability_rating?.toFixed(3) ?? "—"}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="opacity-70">Exposure</span>
+                  <span className="font-bold">{a.result.exposure_rating?.toFixed(3) ?? "—"}</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Right: AI Narrative & COA */}
-        <div className="md:col-span-2 space-y-6">
-          {a.result.narrative ? (
-            <div className="card p-5 bg-bark/5 border-l-4 border-bark">
-              <div className="label-sm mb-2 flex items-center gap-2">
-                <span>🤖</span> AI Summary
+        {activeTab === 'ai' && (
+          <div className="space-y-6 mb-8">
+            {a.result.narrative ? (
+              <div className="card p-5 bg-bark/5 border-l-4 border-bark">
+                <div className="label-sm mb-2 flex items-center gap-2">
+                  <span>🤖</span> AI Summary
+                </div>
+                <p className="text-sm leading-relaxed text-ink italic font-serif">
+                  &quot;{a.result.narrative}&quot;
+                </p>
               </div>
-              <p className="text-sm leading-relaxed text-ink italic font-serif">
-                &quot;{a.result.narrative}&quot;
-              </p>
-            </div>
-          ) : (
-            <div className="card p-5 bg-sand text-center text-[var(--ink-lt)] text-xs italic">
-              AI Analysis not available for this record.
-            </div>
-          )}
+            ) : (
+              <div className="card p-5 bg-sand text-center text-[var(--ink-lt)] text-xs italic">
+                AI Analysis not available for this record.
+              </div>
+            )}
+          </div>
+        )}
 
-          {coa.length > 0 && (
-            <div>
-              <div className="label-sm mb-3">🛠 Recommended Actions</div>
-              <div className="grid grid-cols-1 gap-2">
-                {coa.map((item, i) => (
-                  <div key={i} className="flex gap-3 bg-sand p-3 rounded-lg text-sm border border-[var(--border)]">
-                    <span className="font-bold text-terracotta">{i + 1}.</span>
-                    <span className="text-ink leading-snug">{item.replace(/^\d+\.\s*/, "")}</span>
-                  </div>
-                ))}
+        {activeTab === 'actions' && (
+          <div className="space-y-6 mb-8">
+            {coa.length > 0 ? (
+              <div>
+                <div className="label-sm mb-3">🛠 Recommended Actions</div>
+                <div className="grid grid-cols-1 gap-2">
+                  {coa.map((item, i) => (
+                    <div key={i} className="flex gap-3 bg-sand p-3 rounded-lg text-sm border border-[var(--border)]">
+                      <span className="font-bold text-terracotta">{i + 1}.</span>
+                      <span className="text-ink leading-snug">{item.replace(/^\d+\.\s*/, "")}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            ) : (
+              <div className="card p-5 bg-sand text-center text-[var(--ink-lt)] text-xs italic">
+                No recommended actions available.
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="bg-sand p-4 rounded-lg border border-[var(--border)] text-center">
