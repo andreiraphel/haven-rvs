@@ -25,23 +25,23 @@ export interface RiskWeights {
 
 export const DEFAULT_WEIGHTS: RiskWeights = {
   hazard: {
-    earthquake_intensity: 0.224, fault_distance: 0.185, seismic_source: 0.364, liquefaction: 0.227,
-    wind_speed: 0.657, terrain: 0.343,
-    slope: 0.087, elevation: 0.211, water_distance: 0.175, runoff: 0.269, base_height: 0.140, drainage: 0.118
+    earthquake_intensity: 0.0578, fault_distance: 0.402, seismic_source: 0.1455, liquefaction: 0.3947,
+    wind_speed: 0.6586, terrain: 0.3414,
+    slope: 0.1119, elevation: 0.1656, water_distance: 0.1376, runoff: 0.2844, base_height: 0.1184, drainage: 0.182
   },
   exposure: {
-    b11: 0.159, b12: 0.168, b13: 0.344, b14: 0.329,
-    b21: 0.401, b22: 0.125, b23: 0.093, b24: 0.158, b25: 0.223,
-    b31: 0.378, b32: 0.217, b33: 0.133, b34: 0.272,
-    b41: 0.244, b42: 0.361, b43: 0.115, b44: 0.280
+    b11: 0.2461, b12: 0.2299, b13: 0.3621, b14: 0.1619,
+    b21: 0.1432, b22: 0.1341, b23: 0.3931, b24: 0.2441, b25: 0.0854,
+    b31: 0.0589, b32: 0.2439, b33: 0.6313, b34: 0.0659,
+    b41: 0.0807, b42: 0.229, b43: 0.1478, b44: 0.5426
   },
   vulnerability: {
-    building_code: 0.092, plan_irregularity: 0.053, vertical_irregularity: 0.057, building_proximity: 0.063,
-    stories: 0.031, material: 0.098, bays: 0.051, column_spacing: 0.082,
-    enclosure: 0.146, wall_material: 0.113, framing: 0.102, flooring: 0.069,
-    crack: 0.158, settlement: 0.147, deformations: 0.213, finishing: 0.124, decay: 0.133, loads: 0.225,
-    roof_design: 0.344, roof_slope: 0.424, roof_material: 0.232,
-    roof_fastener_type: 0.632, roof_fastener_dist: 0.368
+    building_code: 0.023, plan_irregularity: 0.031, vertical_irregularity: 0.048, building_proximity: 0.023,
+    stories: 0.049, material: 0.2, bays: 0.074, column_spacing: 0.141,
+    enclosure: 0.04, wall_material: 0.108, framing: 0.221, flooring: 0.042,
+    crack: 0.103, settlement: 0.2495, deformations: 0.1758, finishing: 0.0555, decay: 0.2755, loads: 0.1408,
+    roof_design: 0.1445, roof_slope: 0.6693, roof_material: 0.186,
+    roof_fastener_type: 0.3006, roof_fastener_dist: 0.6994
   }
 };
 

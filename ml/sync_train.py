@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import pickle
 import os
+import requests
+from dotenv import load_dotenv
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.preprocessing import MinMaxScaler, LabelEncoder
@@ -11,31 +13,56 @@ from xgboost import XGBRegressor, XGBClassifier
 
 # --- CONFIGURATION ---
 RANDOM_SEED = 42
-SYNTHETIC_SAMPLES = 150000 
+SYNTHETIC_SAMPLES = 1500000
 np.random.seed(RANDOM_SEED)
 
-# --- WEIGHTS (Same as Spreadsheet) ---
-H_W = {'a1': [0.224, 0.185, 0.364, 0.227], 'a2': [0.657, 0.343], 'a3': [0.087, 0.211, 0.175, 0.269, 0.14, 0.118]}
-E_W = {'b1': [0.159, 0.168, 0.344, 0.329], 'b2': [0.401, 0.125, 0.093, 0.158, 0.223], 'b3': [0.378, 0.217, 0.133, 0.272], 'b4': [0.244, 0.361, 0.115, 0.28]}
-V_W = {'c1': [0.092, 0.053, 0.057, 0.063, 0.031, 0.098, 0.051, 0.082, 0.146, 0.113, 0.102, 0.069], 'c2': [0.158, 0.147, 0.213, 0.124, 0.133, 0.225], 'c3': [0.344, 0.424, 0.232], 'c4': [0.632, 0.368]}
+# --- LOAD WEIGHTS FROM SUPABASE ---
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../.env.local'))
+
+SUPABASE_URL = os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+
+print("🔄 Fetching latest weights from Supabase...")
+response = requests.get(
+    f"{SUPABASE_URL}/rest/v1/risk_weights?select=weights&active=eq.true&order=created_at.desc&limit=1",
+    headers={
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json"
+    }
+)
+response.raise_for_status()
+data = response.json()
+
+if not data:
+    raise Exception("❌ No active weights found in the database. Please run schema.sql to seed the weights first.")
+
+weights = data[0]['weights']
+print("✅ Successfully loaded weights from DB.")
+
+H_W = weights['hazard']
+E_W = weights['exposure']
+V_W = weights['vulnerability']
 
 def compute_manual_index(r):
-    a1 = sum(r[f'a1_{i}'] * H_W['a1'][i] for i in range(4))
-    a2 = sum(r[f'a2_{i}'] * H_W['a2'][i] for i in range(2))
-    a3 = sum(r[f'a3_{i}'] * H_W['a3'][i] for i in range(6))
+    a1 = (r['a1_0'] * H_W['earthquake_intensity']) + (r['a1_1'] * H_W['fault_distance']) + (r['a1_2'] * H_W['seismic_source']) + (r['a1_3'] * H_W['liquefaction'])
+    a2 = (r['a2_0'] * H_W['wind_speed']) + (r['a2_1'] * H_W['terrain'])
+    a3 = (r['a3_0'] * H_W['slope']) + (r['a3_1'] * H_W['elevation']) + (r['a3_2'] * H_W['water_distance']) + (r['a3_3'] * H_W['runoff']) + (r['a3_4'] * H_W['base_height']) + (r['a3_5'] * H_W['drainage'])
     H = np.mean([a1, a2, a3])
-    b1 = sum(r[f'b1_{i}'] * E_W['b1'][i] for i in range(4))
-    b2 = sum(r[f'b2_{i}'] * E_W['b2'][i] for i in range(5))
-    b3 = sum(r[f'b3_{i}'] * E_W['b3'][i] for i in range(4))
-    b4 = sum(r[f'b4_{i}'] * E_W['b4'][i] for i in range(4))
-    E = np.mean([b1, b2, b3, b4])
-    c1 = sum(r[f'c1_{i}'] * V_W['c1'][i] for i in range(12))
-    c2 = sum(r[f'c2_{i}'] * V_W['c2'][i] for i in range(6))
-    c3 = sum(r[f'c3_{i}'] * V_W['c3'][i] for i in range(3))
-    c4 = sum(r[f'c4_{i}'] * V_W['c4'][i] for i in range(2))
-    V = np.mean([c1, c2, c3, c4])
-    return (H * E * V / 27) * 10
 
+    b1 = (r['b1_0'] * E_W['b11']) + (r['b1_1'] * E_W['b12']) + (r['b1_2'] * E_W['b13']) + (r['b1_3'] * E_W['b14'])
+    b2 = (r['b2_0'] * E_W['b21']) + (r['b2_1'] * E_W['b22']) + (r['b2_2'] * E_W['b23']) + (r['b2_3'] * E_W['b24']) + (r['b2_4'] * E_W['b25'])
+    b3 = (r['b3_0'] * E_W['b31']) + (r['b3_1'] * E_W['b32']) + (r['b3_2'] * E_W['b33']) + (r['b3_3'] * E_W['b34'])
+    b4 = (r['b4_0'] * E_W['b41']) + (r['b4_1'] * E_W['b42']) + (r['b4_2'] * E_W['b43']) + (r['b4_3'] * E_W['b44'])
+    E = np.mean([b1, b2, b3, b4])
+
+    c1 = (r['c1_0'] * V_W['building_code']) + (r['c1_1'] * V_W['plan_irregularity']) + (r['c1_2'] * V_W['vertical_irregularity']) + (r['c1_3'] * V_W['building_proximity']) + (r['c1_4'] * V_W['stories']) + (r['c1_5'] * V_W['material']) + (r['c1_6'] * V_W['bays']) + (r['c1_7'] * V_W['column_spacing']) + (r['c1_8'] * V_W['enclosure']) + (r['c1_9'] * V_W['wall_material']) + (r['c1_10'] * V_W['framing']) + (r['c1_11'] * V_W['flooring'])
+    c2 = (r['c2_0'] * V_W['crack']) + (r['c2_1'] * V_W['settlement']) + (r['c2_2'] * V_W['deformations']) + (r['c2_3'] * V_W['finishing']) + (r['c2_4'] * V_W['decay']) + (r['c2_5'] * V_W['loads'])
+    c3 = (r['c3_0'] * V_W['roof_design']) + (r['c3_1'] * V_W['roof_slope']) + (r['c3_2'] * V_W['roof_material'])
+    c4 = (r['c4_0'] * V_W['roof_fastener_type']) + (r['c4_1'] * V_W['roof_fastener_dist'])
+    V = np.mean([c1, c2, c3, c4])
+
+    return (H * E * V / 27) * 10
 def get_risk_label(idx):
     if idx <= 3.58: return 0 # LOW
     if idx <= 6.79: return 1 # MODERATE
@@ -43,43 +70,66 @@ def get_risk_label(idx):
 
 def generate_data(n):
     target_per_class = n // 3
-    rows = []
-    counts = {0: 0, 1: 0, 2: 0}
+    print(f"🎯 Generating balanced dataset using vectorized computation...")
     
-    print(f"🎯 Generating balanced dataset ({target_per_class} per class)...")
+    cols = [f'a1_{i}' for i in range(4)] + [f'a2_{i}' for i in range(2)] + [f'a3_{i}' for i in range(6)] + \
+           [f'b1_{i}' for i in range(4)] + [f'b2_{i}' for i in range(5)] + [f'b3_{i}' for i in range(4)] + [f'b4_{i}' for i in range(4)] + \
+           [f'c1_{i}' for i in range(12)] + [f'c2_{i}' for i in range(6)] + [f'c3_{i}' for i in range(3)] + [f'c4_{i}' for i in range(2)]
     
-    while len(rows) < n:
-        r = {}
-        # Adaptive sampling: If we need more HIGH risk, we push the random range higher
-        if counts[2] < target_per_class:
-            low, high = 2, 3
-        elif counts[1] < target_per_class:
-            low, high = 1, 3
+    all_dfs = []
+    # With the new weights, generating exact 0 and 2 classes is statistically harder.
+    # We must aggressively skew the probability arrays to force the math to hit extremes.
+    for p_dist in [
+        [0.85, 0.10, 0.05], # Aggressively force 1s for LOW risk
+        [0.10, 0.80, 0.10], # Force 2s for MODERATE risk
+        [0.01, 0.04, 0.95], # Aggressively force 3s for HIGH risk
+        [0.40, 0.40, 0.20], # Mixed
+        [0.20, 0.40, 0.40], # Mixed
+    ]:
+        batch_size = target_per_class * 2
+        X_block = np.random.choice([1, 2, 3], size=(batch_size, len(cols)), p=p_dist).astype(np.int8)
+        
+        # Vectorized Risk Calculation
+        a1 = X_block[:, 0:4] @ np.array([H_W['earthquake_intensity'], H_W['fault_distance'], H_W['seismic_source'], H_W['liquefaction']])
+        a2 = X_block[:, 4:6] @ np.array([H_W['wind_speed'], H_W['terrain']])
+        a3 = X_block[:, 6:12] @ np.array([H_W['slope'], H_W['elevation'], H_W['water_distance'], H_W['runoff'], H_W['base_height'], H_W['drainage']])
+        H = (a1 + a2 + a3) / 3.0
+        
+        b1 = X_block[:, 12:16] @ np.array([E_W['b11'], E_W['b12'], E_W['b13'], E_W['b14']])
+        b2 = X_block[:, 16:21] @ np.array([E_W['b21'], E_W['b22'], E_W['b23'], E_W['b24'], E_W['b25']])
+        b3 = X_block[:, 21:25] @ np.array([E_W['b31'], E_W['b32'], E_W['b33'], E_W['b34']])
+        b4 = X_block[:, 25:29] @ np.array([E_W['b41'], E_W['b42'], E_W['b43'], E_W['b44']])
+        E = (b1 + b2 + b3 + b4) / 4.0
+        
+        c1 = X_block[:, 29:41] @ np.array([V_W['building_code'], V_W['plan_irregularity'], V_W['vertical_irregularity'], V_W['building_proximity'], V_W['stories'], V_W['material'], V_W['bays'], V_W['column_spacing'], V_W['enclosure'], V_W['wall_material'], V_W['framing'], V_W['flooring']])
+        c2 = X_block[:, 41:47] @ np.array([V_W['crack'], V_W['settlement'], V_W['deformations'], V_W['finishing'], V_W['decay'], V_W['loads']])
+        c3 = X_block[:, 47:50] @ np.array([V_W['roof_design'], V_W['roof_slope'], V_W['roof_material']])
+        c4 = X_block[:, 50:52] @ np.array([V_W['roof_fastener_type'], V_W['roof_fastener_dist']])
+        V = (c1 + c2 + c3 + c4) / 4.0
+        
+        idx = (H * E * V / 27.0) * 10.0
+        labels = np.where(idx <= 3.58, 0, np.where(idx <= 6.79, 1, 2))
+        
+        df_block = pd.DataFrame(X_block, columns=cols)
+        df_block['risk_index'] = idx
+        df_block['risk_label'] = labels
+        all_dfs.append(df_block)
+        
+    full_df = pd.concat(all_dfs)
+    
+    # Sub-sample to get exactly target_per_class for each
+    balanced_dfs = []
+    for i in range(3):
+        class_df = full_df[full_df['risk_label'] == i]
+        if len(class_df) < target_per_class:
+            print(f"⚠️ Warning: Not enough samples for class {i} (Got {len(class_df)}, need {target_per_class}). Bootstrapping...")
+            class_df = class_df.sample(target_per_class, replace=True)
         else:
-            low, high = 1, 2
-            
-        for i in range(4): r[f'a1_{i}'] = np.random.randint(low, high+1)
-        for i in range(2): r[f'a2_{i}'] = np.random.randint(low, high+1)
-        for i in range(6): r[f'a3_{i}'] = np.random.randint(low, high+1)
-        for i in range(4): r[f'b1_{i}'] = np.random.randint(low, high+1)
-        for i in range(5): r[f'b2_{i}'] = np.random.randint(low, high+1)
-        for i in range(4): r[f'b3_{i}'] = np.random.randint(low, high+1)
-        for i in range(4): r[f'b4_{i}'] = np.random.randint(low, high+1)
-        for i in range(12): r[f'c1_{i}'] = np.random.randint(low, high+1)
-        for i in range(6): r[f'c2_{i}'] = np.random.randint(low, high+1)
-        for i in range(3): r[f'c3_{i}'] = np.random.randint(low, high+1)
-        for i in range(2): r[f'c4_{i}'] = np.random.randint(low, high+1)
+            class_df = class_df.sample(target_per_class, replace=False)
+        balanced_dfs.append(class_df)
         
-        idx = compute_manual_index(r)
-        label = get_risk_label(idx)
-        
-        if counts[label] < target_per_class:
-            r['risk_index'] = idx
-            r['risk_label'] = label
-            rows.append(r)
-            counts[label] += 1
-            
-    return pd.DataFrame(rows)
+    balanced_df = pd.concat(balanced_dfs).sample(frac=1).reset_index(drop=True)
+    return balanced_df
 
 # 1. DATA PREP
 print(f'📊 Generating {SYNTHETIC_SAMPLES} samples...')
@@ -119,18 +169,8 @@ acc = accuracy_score(y_lbl_test, lbl_preds)
 print(f"XGBoost Index Prediction (R2): {r2:.4f}")
 print(f"XGBoost Category Prediction (Accuracy): {acc:.4f}")
 
-# COMPARISON WITH OTHER MODELS
-print("\n--- MODEL COMPARISON ---")
-lr = LinearRegression().fit(X_train_scaled, y_idx_train)
-lr_preds = lr.predict(X_test_scaled)
-print(f"Linear Regression R2: {r2_score(y_idx_test, lr_preds):.4f}")
-
-rf = RandomForestRegressor(n_estimators=100, random_state=RANDOM_SEED, n_jobs=-1).fit(X_train_scaled, y_idx_train)
-rf_preds = rf.predict(X_test_scaled)
-print(f"Random Forest R2: {r2_score(y_idx_test, rf_preds):.4f}")
-
 # Visualizations
-os.makedirs('ml/figures', exist_ok=True)
+os.makedirs('figures', exist_ok=True)
 
 # 1. Confusion Matrix
 plt.figure(figsize=(8, 6))
@@ -139,7 +179,7 @@ sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=['LOW', 'MOD', 'H
 plt.title(f'XGBoost Risk Category Confusion Matrix (Acc: {acc:.2%})')
 plt.ylabel('Actual')
 plt.xlabel('Predicted')
-plt.savefig('ml/figures/confusion_matrix.png')
+plt.savefig('figures/confusion_matrix.png')
 plt.close()
 
 # 2. Feature Importance
@@ -149,7 +189,7 @@ feat_importances.nlargest(20).plot(kind='barh')
 plt.title('Top 20 Features (XGBoost Importance)')
 plt.xlabel('Relative Importance')
 plt.tight_layout()
-plt.savefig('ml/figures/feature_importance.png')
+plt.savefig('figures/feature_importance.png')
 plt.close()
 
 # 3. Accuracy Plot (XGBoost)
@@ -159,32 +199,16 @@ plt.plot([y_idx.min(), y_idx.max()], [y_idx.min(), y_idx.max()], 'r--', lw=2)
 plt.title(f'XGBoost: Predicted vs Actual Risk Index (R2: {r2:.4f})')
 plt.xlabel('Actual Index')
 plt.ylabel('Predicted Index')
-plt.savefig('ml/figures/xgboost_accuracy.png')
-plt.close()
-
-# 4. Accuracy Plot (Random Forest)
-plt.figure(figsize=(10, 6))
-plt.scatter(y_idx_test, rf_preds, alpha=0.3, color='blue')
-plt.plot([y_idx.min(), y_idx.max()], [y_idx.min(), y_idx.max()], 'r--', lw=2)
-plt.title(f'Random Forest: Predicted vs Actual (R2: {r2_score(y_idx_test, rf_preds):.4f})')
-plt.savefig('ml/figures/random_forest_accuracy.png')
-plt.close()
-
-# 5. Accuracy Plot (Linear Regression)
-plt.figure(figsize=(10, 6))
-plt.scatter(y_idx_test, lr_preds, alpha=0.3, color='gray')
-plt.plot([y_idx.min(), y_idx.max()], [y_idx.min(), y_idx.max()], 'r--', lw=2)
-plt.title(f'Linear Regression: Predicted vs Actual (R2: {r2_score(y_idx_test, lr_preds):.4f})')
-plt.savefig('ml/figures/linear_regression_accuracy.png')
+plt.savefig('figures/xgboost_accuracy.png')
 plt.close()
 
 # 5. EXPORT
-os.makedirs('ml/model_exports', exist_ok=True)
-reg.save_model('ml/model_exports/best_model.json') # Regressor
-clf.save_model('ml/model_exports/classifier_model.json') # Classifier
-pickle.dump(scaler, open('ml/model_exports/scaler.pkl', 'wb'))
+os.makedirs('model_exports', exist_ok=True)
+reg.save_model('model_exports/best_model.json') # Regressor
+clf.save_model('model_exports/classifier_model.json') # Classifier
+pickle.dump(scaler, open('model_exports/scaler.pkl', 'wb'))
 le = LabelEncoder().fit(['LOW RISK', 'MODERATE RISK', 'HIGH RISK'])
-pickle.dump(le, open('ml/model_exports/label_encoder.pkl', 'wb'))
+pickle.dump(le, open('model_exports/label_encoder.pkl', 'wb'))
 
 print(f'\n✅ Dual-Model Training Complete.')
 print(f'✅ Artifacts saved: best_model.json (Index) and classifier_model.json (Category)')

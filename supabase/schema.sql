@@ -53,13 +53,12 @@ create table if not exists risk_weights (
 
 alter table risk_weights enable row level security;
 
--- Only authenticated users can read weights
-create policy "Authenticated users can read weights" 
+-- Anyone can read weights (needed for ML backend anon pulls)
+create policy "Anyone can read weights" 
   on risk_weights for select 
-  to authenticated 
   using (true);
 
--- Only authenticated users can insert (for now, any user can update weights)
+-- Only authenticated users can insert
 create policy "Authenticated users can insert weights" 
   on risk_weights for insert 
   to authenticated 
