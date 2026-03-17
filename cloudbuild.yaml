@@ -3,7 +3,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: [
       'build',
-      '-t', '${_AR_HOSTNAME}/$PROJECT_ID/cloud-run-source-deploy/${_SERVICE_NAME}:$COMMIT_SHA',
+      '-t', '${_AR_HOSTNAME}/$PROJECT_ID/cloud-run-source-deploy/${_SERVICE_NAME}:${_TAG}',
       '--build-arg', 'NEXT_PUBLIC_SUPABASE_URL=${_NEXT_PUBLIC_SUPABASE_URL}',
       '--build-arg', 'NEXT_PUBLIC_SUPABASE_ANON_KEY=${_NEXT_PUBLIC_SUPABASE_ANON_KEY}',
       '--build-arg', 'NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${_NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}',
@@ -12,7 +12,7 @@ steps:
 
   # Push the image
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', '${_AR_HOSTNAME}/$PROJECT_ID/cloud-run-source-deploy/${_SERVICE_NAME}:$COMMIT_SHA']
+    args: ['push', '${_AR_HOSTNAME}/$PROJECT_ID/cloud-run-source-deploy/${_SERVICE_NAME}:${_TAG}']
 
   # Deploy to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -22,7 +22,7 @@ steps:
       - 'deploy'
       - '${_SERVICE_NAME}'
       - '--image'
-      - '${_AR_HOSTNAME}/$PROJECT_ID/cloud-run-source-deploy/${_SERVICE_NAME}:$COMMIT_SHA'
+      - '${_AR_HOSTNAME}/$PROJECT_ID/cloud-run-source-deploy/${_SERVICE_NAME}:${_TAG}'
       - '--region'
       - '${_DEPLOY_REGION}'
       - '--platform'
@@ -32,7 +32,7 @@ steps:
       - 'NEXT_PUBLIC_SUPABASE_URL=${_NEXT_PUBLIC_SUPABASE_URL},NEXT_PUBLIC_SUPABASE_ANON_KEY=${_NEXT_PUBLIC_SUPABASE_ANON_KEY},NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${_NEXT_PUBLIC_GOOGLE_MAPS_API_KEY},GEMINI_API_KEY=${_GEMINI_API_KEY},ML_API_URL=${_ML_API_URL}'
 
 images:
-  - '${_AR_HOSTNAME}/$PROJECT_ID/cloud-run-source-deploy/${_SERVICE_NAME}:$COMMIT_SHA'
+  - '${_AR_HOSTNAME}/$PROJECT_ID/cloud-run-source-deploy/${_SERVICE_NAME}:${_TAG}'
 
 substitutions:
   _NEXT_PUBLIC_SUPABASE_URL: ''
@@ -43,3 +43,4 @@ substitutions:
   _DEPLOY_REGION: 'europe-west1'
   _AR_HOSTNAME: 'europe-west1-docker.pkg.dev'
   _SERVICE_NAME: 'haven-frontend'
+  _TAG: 'latest'
