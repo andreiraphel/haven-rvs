@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
       await req.json();
 
     // Use the provided key
-    const apiKey = process.env.VERTEX_API_KEY; 
+    const apiKey = process.env.GEMINI_API_KEY; 
 
     // Process multi-select fields
     const processMultiSelect = (data: any) => {

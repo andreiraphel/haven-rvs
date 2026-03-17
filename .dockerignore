@@ -1,0 +1,10 @@
+node_modules
+.next
+.git
+.gitignore
+.dockerignore
+*.log
+out
+build
+ml/venv
+ml/__pycache__
