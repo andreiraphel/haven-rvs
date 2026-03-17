@@ -14,6 +14,7 @@ export interface Building {
   year_built: number;
   number_of_floors: number;
   photo_urls?: string[];
+  created_by?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -38,6 +39,7 @@ export interface HazardIndicators {
   surface_runoff: string | string[];
   base_height: string;
   drainage_system: string;
+  created_at?: string;
 }
 
 export interface VulnerabilityIndicators {
@@ -69,6 +71,7 @@ export interface VulnerabilityIndicators {
   roofing_material: string | string[];
   roof_fastener: string | string[];
   roof_fastener_distance_mm: number;
+  created_at?: string;
 }
 
 export interface RiskResult {
@@ -85,6 +88,7 @@ export interface RiskResult {
   ai_course_of_action?: string;
   narrative?: string;
   assessed_at?: string;
+  created_at?: string;
 }
 
 export interface ExposureIndicators {
@@ -94,6 +98,7 @@ export interface ExposureIndicators {
   b21: number; b22: number; b23: number; b24: number; b25: number;
   b31: number; b32: number; b33: number; b34: number;
   b41: number; b42: number; b43: number; b44: number;
+  created_at?: string;
 }
 
 export interface Assessment {

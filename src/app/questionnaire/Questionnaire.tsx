@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Topbar from "@/components/layout/Topbar";
 import type { Building, HazardIndicators, VulnerabilityIndicators, ExposureIndicators, RiskResult, RiskLevel } from "@/types";
 import { getSupabase } from "@/lib/supabase";
-import { calculateAssessmentRisk } from "@/lib/risk-calculator";
+import { calculateAssessmentRisk, DEFAULT_WEIGHTS, type RiskWeights } from "@/lib/risk-calculator";
 import { RUNOFF_MAP, PLAN_MAP, MAT_MAP, ENCL_MAP, WALL_MAP, FRAME_MAP, FLOOR_MAP, ROOF_DESIGN_MAP, ROOF_MAT_MAP, FAST_TYPE_MAP } from "@/lib/maps";
 
 // ... (rest of the file is the same until computeAndShow)
@@ -106,6 +106,7 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
   const isEditing = !!editId;
 
   const [step, setStep]       = useState<Step>("building");
+  const [weights, setWeights] = useState<RiskWeights>(DEFAULT_WEIGHTS);
   const [building, setBuilding] = useState<Partial<Building>>({});
   const [buildingId, setBuildingId] = useState<string | null>(null);
   const currentYear = new Date().getFullYear();
@@ -119,6 +120,23 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
     }
     checkAuth();
   }, [router]);
+
+  useEffect(() => {
+    async function loadWeights() {
+      try {
+        const sb = getSupabase();
+        const { data: { session } } = await sb.auth.getSession();
+        if (session) {
+          const res = await fetch("/api/weights", { headers: { Authorization: `Bearer ${session.access_token}` } });
+          if (res.ok) {
+            const w = await res.json();
+            if (w) setWeights(w);
+          }
+        }
+      } catch (e) { console.error("Failed to load weights", e); }
+    }
+    loadWeights();
+  }, []);
   const [hazard, setHazard]   = useState<Partial<HazardIndicators>>({});
   const [vuln, setVuln]       = useState<Partial<VulnerabilityIndicators>>({});
   const [exposure, setExposure] = useState<Partial<ExposureIndicators>>({
@@ -332,7 +350,8 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
           vuln as VulnerabilityIndicators,
           Number(building.year_built ?? 1950),
           isStubFilled,
-          exposure as ExposureIndicators
+          exposure as ExposureIndicators,
+          weights
         );
         console.log("✅ Manual Result:", manualResult);
 

@@ -1,6 +1,50 @@
 import type { HazardIndicators, VulnerabilityIndicators, RiskResult, ExposureIndicators } from "@/types";
 import { PEIS_MAP, LIQ_MAP, TERRAIN_MAP, SLOPE_MAP, RUNOFF_MAP, BASE_MAP, DRAIN_MAP, CODE_MAP, PLAN_MAP, VERT_MAP, PROX_MAP, MAT_MAP, FRAME_MAP, ENCL_MAP, WALL_MAP, FLOOR_MAP, ROOF_DESIGN_MAP, ROOF_SLOPE_MAP, ROOF_MAT_MAP, FAST_TYPE_MAP } from "./maps";
 
+export interface RiskWeights {
+  hazard: {
+    earthquake_intensity: number; fault_distance: number; seismic_source: number; liquefaction: number;
+    wind_speed: number; terrain: number;
+    slope: number; elevation: number; water_distance: number; runoff: number; base_height: number; drainage: number;
+  };
+  exposure: {
+    b11: number; b12: number; b13: number; b14: number;
+    b21: number; b22: number; b23: number; b24: number; b25: number;
+    b31: number; b32: number; b33: number; b34: number;
+    b41: number; b42: number; b43: number; b44: number;
+  };
+  vulnerability: {
+    building_code: number; plan_irregularity: number; vertical_irregularity: number; building_proximity: number;
+    stories: number; material: number; bays: number; column_spacing: number;
+    enclosure: number; wall_material: number; framing: number; flooring: number;
+    crack: number; settlement: number; deformations: number; finishing: number; decay: number; loads: number;
+    roof_design: number; roof_slope: number; roof_material: number;
+    roof_fastener_type: number; roof_fastener_dist: number;
+  };
+}
+
+export const DEFAULT_WEIGHTS: RiskWeights = {
+  hazard: {
+    earthquake_intensity: 0.224, fault_distance: 0.185, seismic_source: 0.364, liquefaction: 0.227,
+    wind_speed: 0.657, terrain: 0.343,
+    slope: 0.087, elevation: 0.211, water_distance: 0.175, runoff: 0.269, base_height: 0.140, drainage: 0.118
+  },
+  exposure: {
+    b11: 0.159, b12: 0.168, b13: 0.344, b14: 0.329,
+    b21: 0.401, b22: 0.125, b23: 0.093, b24: 0.158, b25: 0.223,
+    b31: 0.378, b32: 0.217, b33: 0.133, b34: 0.272,
+    b41: 0.244, b42: 0.361, b43: 0.115, b44: 0.280
+  },
+  vulnerability: {
+    building_code: 0.092, plan_irregularity: 0.053, vertical_irregularity: 0.057, building_proximity: 0.063,
+    stories: 0.031, material: 0.098, bays: 0.051, column_spacing: 0.082,
+    enclosure: 0.146, wall_material: 0.113, framing: 0.102, flooring: 0.069,
+    crack: 0.158, settlement: 0.147, deformations: 0.213, finishing: 0.124, decay: 0.133, loads: 0.225,
+    roof_design: 0.344, roof_slope: 0.424, roof_material: 0.232,
+    roof_fastener_type: 0.632, roof_fastener_dist: 0.368
+  }
+};
+
 function getMaxScore(value: string | string[] | undefined, map: Record<string, number>, defaultValue = 1): number {
   if (Array.isArray(value)) {
     if (value.length === 0) return defaultValue;
@@ -17,36 +61,41 @@ export function calculateAssessmentRisk(
   v: VulnerabilityIndicators,
   yearBuilt: number,
   isDangerStub: boolean = false,
-  e?: ExposureIndicators
+  e?: ExposureIndicators,
+  weights: RiskWeights = DEFAULT_WEIGHTS
 ): RiskResult {
+  const wh = weights.hazard;
+  const we = weights.exposure;
+  const wv = weights.vulnerability;
+
   // --- 1. HAZARD RATING (H) ---
-  const a1 = (PEIS_MAP[h.earthquake_intensity] ?? 1) * 0.224 +
-             (h.fault_distance_km > 10 ? 1 : h.fault_distance_km > 5 ? 2 : 3) * 0.185 +
-             (h.seismic_source_type < 6.5 ? 1 : h.seismic_source_type < 7.0 ? 2 : 3) * 0.364 +
-             (LIQ_MAP[h.potential_liquefaction] ?? 1) * 0.227;
+  const a1 = (PEIS_MAP[h.earthquake_intensity] ?? 1) * wh.earthquake_intensity +
+             (h.fault_distance_km > 10 ? 1 : h.fault_distance_km > 5 ? 2 : 3) * wh.fault_distance +
+             (h.seismic_source_type < 6.5 ? 1 : h.seismic_source_type < 7.0 ? 2 : 3) * wh.seismic_source +
+             (LIQ_MAP[h.potential_liquefaction] ?? 1) * wh.liquefaction;
 
-  const a2 = (h.basic_wind_speed_kph <= 225 ? 1 : h.basic_wind_speed_kph <= 279 ? 2 : 3) * 0.657 +
-             (TERRAIN_MAP[h.terrain] ?? 2) * 0.343;
+  const a2 = (h.basic_wind_speed_kph <= 225 ? 1 : h.basic_wind_speed_kph <= 279 ? 2 : 3) * wh.wind_speed +
+             (TERRAIN_MAP[h.terrain] ?? 2) * wh.terrain;
 
-  const a3 = (SLOPE_MAP[h.slope_degrees] ?? 1) * 0.087 +
-             (h.elevation_m > 10 ? 1 : h.elevation_m >= 5 ? 2 : 3) * 0.211 +
-             (h.distance_to_water_m > 500 ? 1 : h.distance_to_water_m >= 200 ? 2 : 3) * 0.175 +
-             (getMaxScore(h.surface_runoff, RUNOFF_MAP, 1)) * 0.269 +
-             (BASE_MAP[h.base_height] ?? 2) * 0.140 +
-             (DRAIN_MAP[h.drainage_system] ?? 2) * 0.118;
+  const a3 = (SLOPE_MAP[h.slope_degrees] ?? 1) * wh.slope +
+             (h.elevation_m > 10 ? 1 : h.elevation_m >= 5 ? 2 : 3) * wh.elevation +
+             (h.distance_to_water_m > 500 ? 1 : h.distance_to_water_m >= 200 ? 2 : 3) * wh.water_distance +
+             (getMaxScore(h.surface_runoff, RUNOFF_MAP, 1)) * wh.runoff +
+             (BASE_MAP[h.base_height] ?? 2) * wh.base_height +
+             (DRAIN_MAP[h.drainage_system] ?? 2) * wh.drainage;
 
   const hazardRating = (a1 + a2 + a3) / 3;
 
   // --- 2. EXPOSURE RATING (E) ---
   const score = isDangerStub ? 3 : 2;
-  const b1 = (e?.b11 ?? score) * 0.159 + (e?.b12 ?? score) * 0.168 + (e?.b13 ?? score) * 0.344 + (e?.b14 ?? score) * 0.329;
+  const b1 = (e?.b11 ?? score) * we.b11 + (e?.b12 ?? score) * we.b12 + (e?.b13 ?? score) * we.b13 + (e?.b14 ?? score) * we.b14;
   
   const age = 2024 - yearBuilt;
   const ageScore = age <= 75 ? 1 : age <= 125 ? 2 : 3;
-  const b2 = ageScore * 0.401 + (e?.b22 ?? score) * 0.125 + (e?.b23 ?? score) * 0.093 + (e?.b24 ?? score) * 0.158 + (e?.b25 ?? score) * 0.223;
+  const b2 = ageScore * we.b21 + (e?.b22 ?? score) * we.b22 + (e?.b23 ?? score) * we.b23 + (e?.b24 ?? score) * we.b24 + (e?.b25 ?? score) * we.b25;
   
-  const b3 = (e?.b31 ?? score) * 0.378 + (e?.b32 ?? score) * 0.217 + (e?.b33 ?? score) * 0.133 + (e?.b34 ?? score) * 0.272;
-  const b4 = (e?.b41 ?? score) * 0.244 + (e?.b42 ?? score) * 0.361 + (e?.b43 ?? score) * 0.115 + (e?.b44 ?? score) * 0.280;
+  const b3 = (e?.b31 ?? score) * we.b31 + (e?.b32 ?? score) * we.b32 + (e?.b33 ?? score) * we.b33 + (e?.b34 ?? score) * we.b34;
+  const b4 = (e?.b41 ?? score) * we.b41 + (e?.b42 ?? score) * we.b42 + (e?.b43 ?? score) * we.b43 + (e?.b44 ?? score) * we.b44;
 
   const exposureRating = (b1 + b2 + b3 + b4) / 4;
 
@@ -65,7 +114,11 @@ export function calculateAssessmentRisk(
     getMaxScore(v.structural_framing_type, FRAME_MAP, 3),
     getMaxScore(v.flooring_material, FLOOR_MAP, 1)
   ];
-  const c1_weights = [0.092, 0.053, 0.057, 0.063, 0.031, 0.098, 0.051, 0.082, 0.146, 0.113, 0.102, 0.069];
+  const c1_weights = [
+    wv.building_code, wv.plan_irregularity, wv.vertical_irregularity, wv.building_proximity,
+    wv.stories, wv.material, wv.bays, wv.column_spacing,
+    wv.enclosure, wv.wall_material, wv.framing, wv.flooring
+  ];
   const c1 = c1_scores.reduce((sum, s, i) => sum + s * c1_weights[i], 0);
 
   const crackScore = !v.maximum_crack || v.maximum_crack === "-" ? 1 : parseFloat(v.maximum_crack) < 1 ? 1 : parseFloat(v.maximum_crack) <= 3 ? 2 : 3;
@@ -77,13 +130,18 @@ export function calculateAssessmentRisk(
     v.decay_of_structural_member ? 3 : 1,
     v.additional_loads ? 3 : 1
   ];
-  const c2_weights = [0.158, 0.147, 0.213, 0.124, 0.133, 0.225];
+  const c2_weights = [
+    wv.crack, wv.settlement, wv.deformations, wv.finishing, wv.decay, wv.loads
+  ];
   const c2 = c2_scores.reduce((sum, s, i) => sum + s * c2_weights[i], 0);
 
-  const c3 = (getMaxScore(v.roof_design, ROOF_DESIGN_MAP, 2)) * 0.344 + (ROOF_SLOPE_MAP[v.roof_slope] ?? 1) * 0.424 + (getMaxScore(v.roofing_material, ROOF_MAT_MAP, 2)) * 0.232;
+  const c3 = (getMaxScore(v.roof_design, ROOF_DESIGN_MAP, 2)) * wv.roof_design + 
+             (ROOF_SLOPE_MAP[v.roof_slope] ?? 1) * wv.roof_slope + 
+             (getMaxScore(v.roofing_material, ROOF_MAT_MAP, 2)) * wv.roof_material;
   
   const fastenerDist = v.roof_fastener_distance_mm <= 225 ? 1 : v.roof_fastener_distance_mm <= 450 ? 2 : 3;
-  const c4 = (getMaxScore(v.roof_fastener, FAST_TYPE_MAP, 2)) * 0.632 + fastenerDist * 0.368;
+  const c4 = (getMaxScore(v.roof_fastener, FAST_TYPE_MAP, 2)) * wv.roof_fastener_type + 
+             fastenerDist * wv.roof_fastener_dist;
 
   const vulnerabilityRating = (c1 + c2 + c3 + c4) / 4;
 

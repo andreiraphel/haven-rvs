@@ -8,6 +8,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const [form, setForm] = useState({ firstName: "", lastName: "", email: "", password: "", confirm: "" });
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -16,14 +17,26 @@ export default function RegisterPage() {
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     if (form.password !== form.confirm) { setError("Passwords do not match."); return; }
-    setError(""); setLoading(true);
-    const { error } = await supabase.auth.signUp({
-      email: form.email, password: form.password,
-      options: { data: { first_name: form.firstName, last_name: form.lastName } },
-    });
-    if (error) setError(error.message);
-    else router.push("/dashboard");
-    setLoading(false);
+    setError(""); setSuccess(""); setLoading(true);
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: form.email, password: form.password,
+        options: { data: { first_name: form.firstName, last_name: form.lastName } },
+      });
+
+      if (error) {
+        setError(error.message);
+      } else if (data.user && !data.session) {
+        setSuccess("Account created! Please check your email to confirm your registration.");
+      } else {
+        router.push("/dashboard");
+      }
+    } catch (err) {
+      setError("An unexpected error occurred.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -70,6 +83,7 @@ export default function RegisterPage() {
               <input type="password" className="input-field" placeholder="Repeat password" required value={form.confirm} onChange={set("confirm")} />
             </div>
             {error && <p className="text-[var(--risk-high)] text-sm bg-[var(--risk-high-bg)] px-3 py-2 rounded-lg">{error}</p>}
+            {success && <p className="text-[var(--risk-low)] text-sm bg-[var(--risk-low-bg)] px-3 py-2 rounded-lg">{success}</p>}
             <button type="submit" disabled={loading} className="btn-primary w-full py-3">
               {loading ? "Creating…" : "Create Account →"}
             </button>

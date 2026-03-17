@@ -5,7 +5,99 @@
 -- Enable UUID extension
 create extension if not exists "uuid-ossp";
 
--- ── 1. BUILDINGS ───────────────────────────────────────────
+-- ── 1. PROFILES (AUTH) ─────────────────────────────────────
+-- This table is required for the auth trigger to work and store user metadata.
+create table if not exists profiles (
+  id uuid references auth.users(id) on delete cascade primary key,
+  first_name text,
+  last_name text,
+  email text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table profiles enable row level security;
+
+create policy "Users can view own profile" 
+  on profiles for select 
+  using (auth.uid() = id);
+
+create policy "Users can update own profile" 
+  on profiles for update 
+  using (auth.uid() = id);
+
+-- Trigger for new user creation
+create or replace function public.handle_new_user()
+returns trigger as $$
+begin
+  insert into public.profiles (id, first_name, last_name, email)
+  values (new.id, new.raw_user_meta_data->>'first_name', new.raw_user_meta_data->>'last_name', new.email);
+  return new;
+end;
+$$ language plpgsql security definer;
+
+-- Drop trigger if exists to avoid duplication errors
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+
+-- ── 2. RISK WEIGHTS (CONFIGURATION) ────────────────────────
+create table if not exists risk_weights (
+  id uuid primary key default uuid_generate_v4(),
+  weights jsonb not null,
+  active boolean default true,
+  created_at timestamptz default now(),
+  created_by uuid references auth.users(id)
+);
+
+alter table risk_weights enable row level security;
+
+-- Only authenticated users can read weights
+create policy "Authenticated users can read weights" 
+  on risk_weights for select 
+  to authenticated 
+  using (true);
+
+-- Only authenticated users can insert (for now, any user can update weights)
+create policy "Authenticated users can insert weights" 
+  on risk_weights for insert 
+  to authenticated 
+  with check (true);
+
+-- Seed default weights if table is empty
+do $$
+begin
+  if not exists (select 1 from risk_weights) then
+    insert into risk_weights (weights, active)
+    values (
+      '{
+        "hazard": {
+          "earthquake_intensity": 0.224, "fault_distance": 0.185, "seismic_source": 0.364, "liquefaction": 0.227,
+          "wind_speed": 0.657, "terrain": 0.343,
+          "slope": 0.087, "elevation": 0.211, "water_distance": 0.175, "runoff": 0.269, "base_height": 0.140, "drainage": 0.118
+        },
+        "exposure": {
+          "b11": 0.159, "b12": 0.168, "b13": 0.344, "b14": 0.329,
+          "b21": 0.401, "b22": 0.125, "b23": 0.093, "b24": 0.158, "b25": 0.223,
+          "b31": 0.378, "b32": 0.217, "b33": 0.133, "b34": 0.272,
+          "b41": 0.244, "b42": 0.361, "b43": 0.115, "b44": 0.280
+        },
+        "vulnerability": {
+          "building_code": 0.092, "plan_irregularity": 0.053, "vertical_irregularity": 0.057, "building_proximity": 0.063,
+          "stories": 0.031, "material": 0.098, "bays": 0.051, "column_spacing": 0.082,
+          "enclosure": 0.146, "wall_material": 0.113, "framing": 0.102, "flooring": 0.069,
+          "crack": 0.158, "settlement": 0.147, "deformations": 0.213, "finishing": 0.124, "decay": 0.133, "loads": 0.225,
+          "roof_design": 0.344, "roof_slope": 0.424, "roof_material": 0.232,
+          "roof_fastener_type": 0.632, "roof_fastener_dist": 0.368
+        }
+      }'::jsonb,
+      true
+    );
+  end if;
+end $$;
+
+-- ── 3. BUILDINGS ───────────────────────────────────────────
 create table if not exists buildings (
   id               uuid primary key default uuid_generate_v4(),
   name             text not null,
@@ -25,7 +117,7 @@ create table if not exists buildings (
   updated_at       timestamptz default now()
 );
 
--- ── 2. HAZARD INDICATORS ───────────────────────────────────
+-- ── 4. HAZARD INDICATORS ───────────────────────────────────
 create table if not exists hazard_indicators (
   id                      uuid primary key default uuid_generate_v4(),
   building_id             uuid not null references buildings(id) on delete cascade,
@@ -46,7 +138,7 @@ create table if not exists hazard_indicators (
   created_at              timestamptz default now()
 );
 
--- ── 3. VULNERABILITY INDICATORS ────────────────────────────
+-- ── 5. VULNERABILITY INDICATORS ────────────────────────────
 create table if not exists vulnerability_indicators (
   id                         uuid primary key default uuid_generate_v4(),
   building_id                uuid not null references buildings(id) on delete cascade,
@@ -76,7 +168,7 @@ create table if not exists vulnerability_indicators (
   created_at                 timestamptz default now()
 );
 
--- ── 4. EXPOSURE INDICATORS (HERITAGE VALUE) ───────────────
+-- ── 6. EXPOSURE INDICATORS (HERITAGE VALUE) ───────────────
 create table if not exists exposure_indicators (
   id                      uuid primary key default uuid_generate_v4(),
   building_id             uuid not null references buildings(id) on delete cascade,
@@ -104,7 +196,7 @@ create table if not exists exposure_indicators (
   created_at              timestamptz default now()
 );
 
--- ── 5. RISK RESULTS (ML PRIMARY) ──────────────────────────
+-- ── 7. RISK RESULTS (ML PRIMARY) ──────────────────────────
 create table if not exists risk_results (
   id                   uuid primary key default uuid_generate_v4(),
   building_id          uuid not null references buildings(id) on delete cascade,
@@ -122,7 +214,7 @@ create table if not exists risk_results (
   assessed_by          uuid not null references auth.users(id)
 );
 
--- ── 6. AUDIT TRAIL ─────────────────────────────────────────
+-- ── 8. AUDIT TRAIL ─────────────────────────────────────────
 create table if not exists questionnaire_responses (
   id          uuid primary key default uuid_generate_v4(),
   building_id uuid not null references buildings(id) on delete cascade,
@@ -131,7 +223,7 @@ create table if not exists questionnaire_responses (
   created_at  timestamptz default now()
 );
 
--- ── 7. SECURITY (RLS) ──────────────────────────────────────
+-- ── 9. SECURITY (RLS) ──────────────────────────────────────
 alter table buildings enable row level security;
 alter table hazard_indicators enable row level security;
 alter table vulnerability_indicators enable row level security;
@@ -157,7 +249,7 @@ using (exists (select 1 from buildings where id = building_id and created_by = a
 create policy "Users can manage responses" on questionnaire_responses for all to authenticated 
 using (exists (select 1 from buildings where id = building_id and created_by = auth.uid()));
 
--- ── 8. TRIGGERS ────────────────────────────────────────────
+-- ── 10. TRIGGERS ────────────────────────────────────────────
 create or replace function update_updated_at()
 returns trigger language plpgsql as $$
 begin new.updated_at = now(); return new; end;

@@ -8,6 +8,7 @@ import { LogOut, Menu, X } from "lucide-react";
 const NAV = [
   { label: "Dashboard",    href: "/dashboard" },
   { label: "Risk Summary", href: "/risk-summary" },
+  { label: "Weights",      href: "/weights" },
   { label: "Map View",     href: "/map" },
   { label: "About",        href: "/about" },
   { label: "Contact",      href: "/contact" },
