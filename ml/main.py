@@ -254,15 +254,15 @@ def predict(req: PredictRequest):
         if model_idx and model_clf and scaler:
             feats = encode_inputs(req.hazard, req.vulnerability, req.exposure, req.year_built, req.isStub)
             X_scaled = scaler.transform([feats])
-            ml_val = round(float(model_idx.predict(X_scaled)[0]), 4)
+            ml_val = round(float(model_idx.predict(X_scaled)[0]), 6)
             cat_idx = int(model_clf.predict(X_scaled)[0])
             ml_cat = le.inverse_transform([cat_idx])[0]
 
         desc = "LOW RISK" if manual_idx <= 3.58 else "MODERATE RISK" if manual_idx <= 6.79 else "HIGH RISK"
         return {
-            "risk_index": round(float(manual_idx), 4), "risk_description": desc,
-            "hazard_rating": round(float(h_rating), 4), "vulnerability_rating": round(float(v_rating), 4),
-            "exposure_rating": round(float(e_rating), 4), "risk_rating": round(float(risk_rating), 4),    
+            "risk_index": round(float(manual_idx), 6), "risk_description": desc,
+            "hazard_rating": round(float(h_rating), 6), "vulnerability_rating": round(float(v_rating), 6),
+            "exposure_rating": round(float(e_rating), 6), "risk_rating": round(float(risk_rating), 6),    
             "ml_prediction": ml_val, "ml_category": ml_cat
         }
     except Exception as e:

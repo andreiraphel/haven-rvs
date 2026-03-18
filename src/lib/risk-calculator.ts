@@ -153,11 +153,11 @@ export function calculateAssessmentRisk(
 
   return {
     building_id: "",
-    risk_index: Math.round(riskIndex * 1000) / 1000,
+    risk_index: Math.round(riskIndex * 1000000) / 1000000,
     risk_description: riskDescription as any,
-    hazard_rating: Math.round(hazardRating * 1000) / 1000,
-    vulnerability_rating: Math.round(vulnerabilityRating * 1000) / 1000,
-    exposure_rating: Math.round(exposureRating * 1000) / 1000,
-    risk_rating: Math.round(riskRating * 1000) / 1000,
+    hazard_rating: Math.round(hazardRating * 1000000) / 1000000,
+    vulnerability_rating: Math.round(vulnerabilityRating * 1000000) / 1000000,
+    exposure_rating: Math.round(exposureRating * 1000000) / 1000000,
+    risk_rating: Math.round(riskRating * 1000000) / 1000000,
   };
 }

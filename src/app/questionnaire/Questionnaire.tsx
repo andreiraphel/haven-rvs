@@ -789,12 +789,12 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
               <h3 className="font-sora font-bold text-xl text-ink">Assessment Result</h3>
               <div className={`p-8 rounded-2xl border-4 ${riskColor}`}>
                 <div className="text-sm font-bold tracking-widest uppercase opacity-70 mb-2">Statistical Risk Index</div>
-                <div className="text-7xl font-extrabold mb-2">{result.risk_index.toFixed(2)}</div>
+                <div className="text-7xl font-extrabold mb-2">{result.risk_index.toFixed(5)}</div>
                 <div className="text-xl font-bold">{result.risk_description}</div>
                 
                 <div className="mt-4 pt-4 border-t border-current/20 text-xs font-medium">
                   <span className="opacity-70">Manual Verification: </span>
-                  <span className="font-bold">{result.manual_index?.toFixed(2) ?? "—"}</span>
+                  <span className="font-bold">{result.manual_index?.toFixed(5) ?? "—"}</span>
                 </div>
               </div>
               <button className="btn-primary w-full py-4" onClick={() => router.push("/risk-summary")}>View All Summary →</button>
