@@ -171,7 +171,7 @@ export default function RiskSummaryPage() {
                           a.result.risk_description === "MODERATE RISK" ? "text-[var(--risk-mod)]" :
                           "text-[var(--risk-high)]"
                         }`}>
-                          {a.result.risk_index !== undefined ? a.result.risk_index.toFixed(2) : "—"}
+                          {a.result.risk_index !== undefined ? a.result.risk_index.toFixed(6) : "—"}
                         </span>
                       </td>
                       <td className="px-5 py-4"><RiskBadge level={a.result.risk_description} /></td>
@@ -363,7 +363,7 @@ function DetailModal({ assessment: a, onClose, router }: { assessment: Assessmen
         <div className="flex flex-col items-center text-center md:min-w-[240px] md:pr-8 md:border-r border-current/20">
           <div className="text-[10px] font-bold uppercase tracking-[0.2em] mb-2 opacity-70 text-current">Statistical Risk Index</div>
           <div className="font-sora font-extrabold text-7xl leading-none mb-2">
-            {a.result.risk_index?.toFixed(2) ?? "—"}
+            {a.result.risk_index?.toFixed(6) ?? "—"}
           </div>
           <div className="text-sm font-bold uppercase tracking-widest">{rc}</div>
         </div>

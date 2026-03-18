@@ -137,7 +137,7 @@ export default function DashboardPage() {
                           a.result.risk_description === "LOW RISK" ? "text-[var(--risk-low)]" :
                           a.result.risk_description === "MODERATE RISK" ? "text-[var(--risk-mod)]" :
                           "text-[var(--risk-high)]"
-                        }`}>{a.result.risk_index.toFixed(5)}</span>
+                        }`}>{a.result.risk_index.toFixed(6)}</span>
                       </td>
                       <td className="px-5 py-4"><RiskBadge level={a.result.risk_description} /></td>
                     </tr>
@@ -252,7 +252,7 @@ function BuildingModal({ assessment: a, onClose }: { assessment: CombinedData; o
             <div className={`rounded-xl border p-8 flex flex-col items-center text-center h-full justify-center ${riskCls}`}>
               <div className="text-xs font-bold uppercase tracking-[0.2em] mb-4 opacity-70 text-current">Overall Risk Index</div>
               <div className="font-sora font-extrabold text-7xl leading-none mb-6">
-                {a.result.risk_index?.toFixed(2) ?? "—"}
+                {a.result.risk_index?.toFixed(6) ?? "—"}
               </div>
               <div className="text-sm font-bold uppercase tracking-widest px-5 py-2 rounded-full bg-white/20 border border-current/10">
                 {rc}
