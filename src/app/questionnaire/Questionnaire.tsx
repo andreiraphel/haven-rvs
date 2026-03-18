@@ -216,9 +216,12 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
   function setV(k: string, v: unknown) { setVuln(f => ({ ...f, [k]: v })); }
   function setE(k: string, v: number) { setExposure(f => ({ ...f, [k]: v })); }
   
-  function handleNum(k: string, v: string, setter: (k: string, num: number) => void) {
+  function handleNum(k: string, v: string, setter: (k: string, num: any) => void) {
     setNumInputs(prev => ({ ...prev, [k]: v }));
-    if (v === "" || v === "-") return;
+    if (v === "" || v === "-") {
+      setter(k, null);
+      return;
+    }
     const num = parseFloat(v);
     if (!isNaN(num)) setter(k, num);
   }
@@ -368,7 +371,10 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
           body: JSON.stringify(buildingPayload),
         });
-        if (!buildingRes.ok) throw new Error("Failed to save building");
+        if (!buildingRes.ok) {
+          const errorData = await buildingRes.json();
+          throw new Error(errorData.error || "Failed to save building");
+        }
         const savedBuilding = await buildingRes.json();
         const activeBuildingId = savedBuilding.id;
         console.log("✅ Building Saved:", activeBuildingId);
