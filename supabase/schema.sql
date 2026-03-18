@@ -111,7 +111,7 @@ create table if not exists buildings (
   year_built       integer,
   number_of_floors integer,
   photo_urls       text[],        
-  created_by       uuid not null references auth.users(id),
+  created_by       uuid not null references auth.users(id) on delete cascade,
   created_at       timestamptz default now(),
   updated_at       timestamptz default now()
 );
@@ -210,7 +210,7 @@ create table if not exists risk_results (
   narrative            text,
   ai_course_of_action  text,
   assessed_at          timestamptz default now(),
-  assessed_by          uuid not null references auth.users(id)
+  assessed_by          uuid not null references auth.users(id) on delete cascade
 );
 
 -- ── 8. AUDIT TRAIL ─────────────────────────────────────────
