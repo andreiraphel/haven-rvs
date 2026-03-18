@@ -48,7 +48,7 @@ create table if not exists risk_weights (
   weights jsonb not null,
   active boolean default true,
   created_at timestamptz default now(),
-  created_by uuid references auth.users(id)
+  created_by uuid references auth.users(id) on delete cascade
 );
 
 alter table risk_weights enable row level security;
