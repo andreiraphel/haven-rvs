@@ -364,13 +364,11 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
         
         const buildingEndpoint = "/api/buildings";
         const buildingMethod = isEditing ? "PUT" : "POST";
-        const buildingPayload = isEditing ? { ...building, id: buildingId, created_by: user.id } : { ...building, created_by: user.id };
 
-        const { risk_results, profiles, created_at: _ca, updated_at: _ua, ...cleanBuilding } = building;
-        const buildingPayload = isEditing 
-          ? { ...cleanBuilding, id: buildingId, created_by: user.id } 
+        const { risk_results, profiles, created_at: _ca, updated_at: _ua, ...cleanBuilding } = building as any;
+        const buildingPayload = isEditing
+          ? { ...cleanBuilding, id: buildingId, created_by: user.id }
           : { ...cleanBuilding, created_by: user.id };
-
         const buildingRes = await fetch(buildingEndpoint, {
           method: buildingMethod,
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },

@@ -137,7 +137,7 @@ export default function DashboardPage() {
                           a.result.risk_description === "LOW RISK" ? "text-[var(--risk-low)]" :
                           a.result.risk_description === "MODERATE RISK" ? "text-[var(--risk-mod)]" :
                           "text-[var(--risk-high)]"
-                        }`}>{a.result.risk_index.toFixed(2)}</span>
+                        }`}>{a.result.risk_index.toFixed(5)}</span>
                       </td>
                       <td className="px-5 py-4"><RiskBadge level={a.result.risk_description} /></td>
                     </tr>
