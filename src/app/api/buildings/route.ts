@@ -28,24 +28,45 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = getSupabase(req);
-  const body = await req.json();
+  try {
+    const supabase = getSupabase(req);
+    const body = await req.json();
 
-  const { data, error } = await supabase.from("buildings").insert(body).select().single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data, { status: 201 });
+    // Clean data: remove any potential client-side noise like empty strings for UUIDs
+    const { id, created_at, updated_at, ...insertData } = body;
+
+    const { data, error } = await supabase.from("buildings").insert(insertData).select().single();
+
+    if (error) {
+      console.error("Supabase Insert Error:", error);
+      return NextResponse.json({ error: error.message, details: error.details }, { status: 400 });
+    }
+    return NextResponse.json(data, { status: 201 });
+  } catch (err: any) {
+    console.error("Buildings POST Route Crash:", err);
+    return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 });
+  }
 }
 
 export async function PUT(req: NextRequest) {
-  const supabase = getSupabase(req);
-  const body = await req.json();
-  const { id, ...updateData } = body;
+  try {
+    const supabase = getSupabase(req);
+    const body = await req.json();
+    const { id, created_at, updated_at, created_by, ...updateData } = body;
 
-  if (!id) {
-    return NextResponse.json({ error: "Missing building ID" }, { status: 400 });
+    if (!id) {
+      return NextResponse.json({ error: "Missing building ID" }, { status: 400 });
+    }
+
+    const { data, error } = await supabase.from("buildings").update(updateData).eq("id", id).select().single();
+
+    if (error) {
+      console.error("Supabase Update Error:", error);
+      return NextResponse.json({ error: error.message, details: error.details }, { status: 400 });
+    }
+    return NextResponse.json(data, { status: 200 });
+  } catch (err: any) {
+    console.error("Buildings PUT Route Crash:", err);
+    return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 });
   }
-
-  const { data, error } = await supabase.from("buildings").update(updateData).eq("id", id).select().single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data, { status: 200 });
 }
