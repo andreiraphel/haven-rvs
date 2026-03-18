@@ -22,7 +22,10 @@ export default function RegisterPage() {
     try {
       const { data, error } = await supabase.auth.signUp({
         email: form.email, password: form.password,
-        options: { data: { first_name: form.firstName, last_name: form.lastName } },
+        options: { 
+          data: { first_name: form.firstName, last_name: form.lastName },
+          emailRedirectTo: `${window.location.origin}/dashboard`
+        },
       });
 
       if (error) {
