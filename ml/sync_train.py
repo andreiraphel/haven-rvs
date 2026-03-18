@@ -119,10 +119,10 @@ real_exposures = {e['building_id']: e for e in fetch_supabase_table("exposure_in
 
 def encode_real_building(b, h, v, e):
     # This logic must match main.py encode_inputs
-    def get_max(val, mapping):
-        if not val: return 1
-        if isinstance(val, str): return mapping.get(val, 1)
-        return max([mapping.get(x, 1) for x in val]) if val else 1
+    def get_max(val, mapping, default_val=1):
+        if not val: return default_val
+        if isinstance(val, str): return mapping.get(val, default_val)
+        return max([mapping.get(x, default_val) for x in val]) if val else default_val
 
     peis = get_peis_score(h.get("earthquake_intensity"))
     fault = get_fault_score(h.get("fault_distance_km", 10))
@@ -147,13 +147,13 @@ def encode_real_building(b, h, v, e):
     if e:
         b11=e.get("b11", def_score); b12=e.get("b12", def_score); b13=e.get("b13", def_score); b14=e.get("b14", def_score)
         age_s = get_age_score(year_built)
-        b22=e.get("b22", def_score); b23=e.get("b23", 1); b24=e.get("b24", def_score); b25=e.get("b25", def_score)
+        b22=e.get("b22", def_score); b23=e.get("b23", def_score); b24=e.get("b24", def_score); b25=e.get("b25", def_score)
         b31=e.get("b31", def_score); b32=e.get("b32", def_score); b33=e.get("b33", def_score); b34=e.get("b34", def_score)
         b41=e.get("b41", def_score); b42=e.get("b42", def_score); b43=e.get("b43", def_score); b44=e.get("b44", def_score)
     else:
         b11=def_score; b12=def_score; b13=def_score; b14=def_score
         age_s = get_age_score(year_built)
-        b22=def_score; b23=1; b24=def_score; b25=def_score
+        b22=def_score; b23=def_score; b24=def_score; b25=def_score
         b31=def_score; b32=def_score; b33=def_score; b34=def_score
         b41=def_score; b42=def_score; b43=def_score; b44=def_score
         
@@ -165,10 +165,10 @@ def encode_real_building(b, h, v, e):
     return [
         peis, fault, source, liq, wind, terrain, slope, elev, water, runoff, base, drain,
         b11, b12, b13, b14, age_s, b22, b23, b24, b25, b31, b32, b33, b34, b41, b42, b43, b44,
-        CODE_MAP.get(v.get("building_code"), 2), get_max(v.get("plan_irregularity"), PLAN_MAP), VERT_MAP.get(v.get("vertical_irregularity"), 1), PROX_MAP.get(v.get("building_proximity"), 1), (3 if stories >= 3 else stories), get_max(v.get("structural_material"), MAT_MAP), (1 if bays >= 5 else 2 if bays >= 3 else 3), (1 if spacing < 3 else 2 if spacing <= 5 else 3), get_max(v.get("building_enclosure"), ENCL_MAP), get_max(v.get("wall_material"), WALL_MAP), get_max(v.get("structural_framing_type"), FRAME_MAP), get_max(v.get("flooring_material"), FLOOR_MAP),
+        CODE_MAP.get(v.get("building_code"), 2), get_max(v.get("plan_irregularity"), PLAN_MAP, 1), VERT_MAP.get(v.get("vertical_irregularity"), 1), PROX_MAP.get(v.get("building_proximity"), 1), (3 if stories >= 3 else stories), get_max(v.get("structural_material"), MAT_MAP, 2), (1 if bays >= 5 else 2 if bays >= 3 else 3), (1 if spacing < 3 else 2 if spacing <= 5 else 3), get_max(v.get("building_enclosure"), ENCL_MAP, 1), get_max(v.get("wall_material"), WALL_MAP, 2), get_max(v.get("structural_framing_type"), FRAME_MAP, 3), get_max(v.get("flooring_material"), FLOOR_MAP, 1),
         get_crack_score(v.get("maximum_crack")), (3 if v.get("uneven_settlement") else 1), (3 if v.get("beam_column_deformations") else 1), (3 if v.get("finishing_condition") else 1), (3 if v.get("decay_of_structural_member") else 1), (3 if v.get("additional_loads") else 1),
-        get_max(v.get("roof_design"), ROOF_DESIGN_MAP), ROOF_SLOPE_MAP.get(v.get("roof_slope"), 1), get_max(v.get("roofing_material"), ROOF_MAT_MAP),
-        get_max(v.get("roof_fastener"), FAST_TYPE_MAP), f_dist
+        get_max(v.get("roof_design"), ROOF_DESIGN_MAP, 2), ROOF_SLOPE_MAP.get(v.get("roof_slope"), 1), get_max(v.get("roofing_material"), ROOF_MAT_MAP, 2),
+        get_max(v.get("roof_fastener"), FAST_TYPE_MAP, 2), f_dist
     ]
 
 def compute_label(feats):
@@ -293,7 +293,7 @@ X_test_scaled = scaler.transform(X_test)
 
 # --- TRAINING ---
 print('🚀 Training Index Regressor...')
-reg = XGBRegressor(n_estimators=500, max_depth=6, learning_rate=0.05, random_state=RANDOM_SEED, n_jobs=-1)
+reg = XGBRegressor(n_estimators=2000, max_depth=8, learning_rate=0.05, random_state=RANDOM_SEED, n_jobs=-1)
 reg.fit(X_train_scaled, y_idx_train)
 
 print('🚀 Training Category Classifier...')
@@ -306,8 +306,10 @@ lbl_preds = clf.predict(X_test_scaled)
 
 print("\n--- PERFORMANCE REPORT ---")
 r2 = r2_score(y_idx_test, idx_preds)
+mae = mean_absolute_error(y_idx_test, idx_preds)
 acc = accuracy_score(y_lbl_test, lbl_preds)
 print(f"XGBoost Index Prediction (R2): {r2:.4f}")
+print(f"XGBoost Index Prediction (MAE): {mae:.4f}")
 print(f"XGBoost Category Prediction (Accuracy): {acc:.4f}")
 
 # Visualizations
