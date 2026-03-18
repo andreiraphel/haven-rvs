@@ -8,7 +8,10 @@ import requests
 from dotenv import load_dotenv
 from xgboost import XGBRegressor, XGBClassifier
 
-load_dotenv(dotenv_path='../.env.local')
+if os.path.exists('.env'):
+    load_dotenv('.env')
+elif os.path.exists('../.env.local'):
+    load_dotenv(dotenv_path='../.env.local')
 
 # Initialize FastAPI
 app = FastAPI(title="HAVEN-RVS Dual-Engine ML Server")
