@@ -366,14 +366,26 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
         const buildingMethod = isEditing ? "PUT" : "POST";
         const buildingPayload = isEditing ? { ...building, id: buildingId, created_by: user.id } : { ...building, created_by: user.id };
 
+        const { risk_results, profiles, created_at: _ca, updated_at: _ua, ...cleanBuilding } = building;
+        const buildingPayload = isEditing 
+          ? { ...cleanBuilding, id: buildingId, created_by: user.id } 
+          : { ...cleanBuilding, created_by: user.id };
+
         const buildingRes = await fetch(buildingEndpoint, {
           method: buildingMethod,
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
           body: JSON.stringify(buildingPayload),
         });
+
         if (!buildingRes.ok) {
-          const errorData = await buildingRes.json();
-          throw new Error(errorData.error || "Failed to save building");
+          let detailedError = "Failed to save building";
+          try {
+            const errorData = await buildingRes.json();
+            detailedError = errorData.error || errorData.message || JSON.stringify(errorData);
+          } catch (e) {
+            detailedError = `Server error (${buildingRes.status}): ${buildingRes.statusText}`;
+          }
+          throw new Error(detailedError);
         }
         const savedBuilding = await buildingRes.json();
         const activeBuildingId = savedBuilding.id;
