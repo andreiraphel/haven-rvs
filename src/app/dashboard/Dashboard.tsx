@@ -269,7 +269,7 @@ function BuildingModal({ assessment: a, onClose }: { assessment: CombinedData; o
                     <div className="text-[10px] text-[var(--ink-lt)] uppercase tracking-wider">Rating</div>
                   </div>
                 </div>
-                <span className="font-sora font-bold text-xl text-ink">{a.result.hazard_rating?.toFixed(3) ?? "—"}</span>
+                <span className="font-sora font-bold text-xl text-ink">{a.result.hazard_rating?.toFixed(6) ?? "—"}</span>
               </div>
 
               <div className="bg-sand p-5 rounded-xl border border-[var(--border)] flex items-center justify-between">
@@ -280,7 +280,7 @@ function BuildingModal({ assessment: a, onClose }: { assessment: CombinedData; o
                     <div className="text-[10px] text-[var(--ink-lt)] uppercase tracking-wider">Rating</div>
                   </div>
                 </div>
-                <span className="font-sora font-bold text-xl text-ink">{a.result.vulnerability_rating?.toFixed(3) ?? "—"}</span>
+                <span className="font-sora font-bold text-xl text-ink">{a.result.vulnerability_rating?.toFixed(6) ?? "—"}</span>
               </div>
 
               <div className="bg-sand p-5 rounded-xl border border-[var(--border)] flex items-center justify-between">
@@ -291,7 +291,7 @@ function BuildingModal({ assessment: a, onClose }: { assessment: CombinedData; o
                     <div className="text-[10px] text-[var(--ink-lt)] uppercase tracking-wider">Rating</div>
                   </div>
                 </div>
-                <span className="font-sora font-bold text-xl text-ink">{a.result.exposure_rating?.toFixed(3) ?? "—"}</span>
+                <span className="font-sora font-bold text-xl text-ink">{a.result.exposure_rating?.toFixed(6) ?? "—"}</span>
               </div>
             </div>
           </div>

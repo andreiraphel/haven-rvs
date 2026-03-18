@@ -372,7 +372,7 @@ function DetailModal({ assessment: a, onClose, router }: { assessment: Assessmen
           <div className="flex flex-col justify-center min-w-[100px]">
             <span className="text-[10px] uppercase font-bold opacity-60 mb-1 leading-tight">Manual<br/>Verification</span>
             <span className="text-xl font-bold border-t border-current/10 pt-1">
-              {a.result.manual_index?.toFixed(2) ?? a.result.risk_index?.toFixed(2) ?? "—"}
+              {a.result.manual_index?.toFixed(6) ?? a.result.risk_index?.toFixed(6) ?? "—"}
             </span>
           </div>
           
@@ -380,17 +380,17 @@ function DetailModal({ assessment: a, onClose, router }: { assessment: Assessmen
 
           <div className="flex flex-col justify-center">
             <span className="text-[10px] uppercase font-bold opacity-60 mb-1 leading-tight">Hazard<br/>Rating</span>
-            <span className="text-lg font-bold border-t border-current/10 pt-1">{a.result.hazard_rating?.toFixed(3) ?? "—"}</span>
+            <span className="text-lg font-bold border-t border-current/10 pt-1">{a.result.hazard_rating?.toFixed(6) ?? "—"}</span>
           </div>
 
           <div className="flex flex-col justify-center">
             <span className="text-[10px] uppercase font-bold opacity-60 mb-1 leading-tight">Vulnerability<br/>Rating</span>
-            <span className="text-lg font-bold border-t border-current/10 pt-1">{a.result.vulnerability_rating?.toFixed(3) ?? "—"}</span>
+            <span className="text-lg font-bold border-t border-current/10 pt-1">{a.result.vulnerability_rating?.toFixed(6) ?? "—"}</span>
           </div>
 
           <div className="flex flex-col justify-center">
             <span className="text-[10px] uppercase font-bold opacity-60 mb-1 leading-tight">Exposure<br/>Rating</span>
-            <span className="text-lg font-bold border-t border-current/10 pt-1">{a.result.exposure_rating?.toFixed(3) ?? "—"}</span>
+            <span className="text-lg font-bold border-t border-current/10 pt-1">{a.result.exposure_rating?.toFixed(6) ?? "—"}</span>
           </div>
         </div>
       </div>
