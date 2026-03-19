@@ -20,7 +20,8 @@ np.random.seed(RANDOM_SEED)
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../.env.local'))
 
 SUPABASE_URL = os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+# Use Service Role Key if available (to bypass RLS for training), otherwise fallback to Anon Key
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise Exception("❌ Missing Supabase credentials in environment variables.")
@@ -124,6 +125,12 @@ def encode_real_building(b, h, v, e):
         if isinstance(val, str): return mapping.get(val, default_val)
         return max([mapping.get(x, default_val) for x in val]) if val else default_val
 
+    def safe_float(val, default=0.0):
+        try:
+            return float(val) if val is not None else default
+        except:
+            return default
+
     peis = get_peis_score(h.get("earthquake_intensity"))
     fault = get_fault_score(h.get("fault_distance_km", 10))
     source = get_source_score(h.get("seismic_source_type", 7.0))
@@ -159,8 +166,9 @@ def encode_real_building(b, h, v, e):
         
     stories = int(v.get("number_of_stories", 1))
     bays = int(v.get("number_of_bays", 5))
-    spacing = float(v.get("column_spacing_m", 2))
-    f_dist = 1 if float(v.get("roof_fastener_distance_mm", 200)) <= 225 else 2 if float(v.get("roof_fastener_distance_mm", 200)) <= 450 else 3
+    spacing = safe_float(v.get("column_spacing_m"), 2.0)
+    f_dist_val = safe_float(v.get("roof_fastener_distance_mm"), 200.0)
+    f_dist = 1 if f_dist_val <= 225 else 2 if f_dist_val <= 450 else 3
 
     return [
         peis, fault, source, liq, wind, terrain, slope, elev, water, runoff, base, drain,
