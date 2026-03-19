@@ -13,7 +13,7 @@ from xgboost import XGBRegressor, XGBClassifier
 
 # --- CONFIGURATION ---
 RANDOM_SEED = 42
-SYNTHETIC_SAMPLES = 1500000
+SYNTHETIC_SAMPLES = 100000
 np.random.seed(RANDOM_SEED)
 
 # --- LOAD ENVIRONMENT ---
