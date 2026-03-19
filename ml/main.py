@@ -7,22 +7,12 @@ import os
 import requests
 from dotenv import load_dotenv
 from xgboost import XGBRegressor, XGBClassifier
+from contextlib import asynccontextmanager
 
 if os.path.exists('.env'):
     load_dotenv('.env')
 elif os.path.exists('../.env.local'):
     load_dotenv(dotenv_path='../.env.local')
-
-# Initialize FastAPI
-app = FastAPI(title="HAVEN-RVS Dual-Engine ML Server")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # --- MEMORY OPTIMIZED LOADING ---
 model_idx = None # Regressor
@@ -54,6 +44,26 @@ def load_artifacts():
         print(f"✅ Model artifacts loaded successfully")
     except Exception as e:
         print(f"❌ CRITICAL ERROR during loading: {e}")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Load models on startup to avoid race conditions during concurrent requests
+    load_artifacts()
+    yield
+
+# Initialize FastAPI with lifespan
+app = FastAPI(
+    title="HAVEN-RVS Dual-Engine ML Server",
+    lifespan=lifespan
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # --- SCHEMAS ---
 class PredictRequest(BaseModel):
@@ -197,7 +207,7 @@ def encode_inputs(hazard: dict, vulnerability: dict, exposure: dict = None, year
 @app.post("/predict", response_model=PredictResponse)
 def predict(req: PredictRequest):
     try:
-        load_artifacts()
+        # load_artifacts() removed - handled by lifespan startup
         weights = get_active_weights()
         wh = weights['hazard']
         we = weights['exposure']
