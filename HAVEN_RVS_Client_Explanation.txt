@@ -1,0 +1,62 @@
+HAVEN-RVS: System Architecture and Technical Overview
+===================================================
+
+1. Project Overview: What is HAVEN-RVS?
+---------------------------------------
+HAVEN-RVS (Heritage And Ancestral Houses Visual Evaluation Network — Rapid Visual Screening) is a digital platform designed to evaluate the structural integrity and risk level of heritage houses in the Philippines. It modernizes the traditional manual engineering inspection process by integrating a web-based interface, machine learning algorithms, and generative artificial intelligence.
+
+2. Frontend vs. Backend Architecture
+------------------------------------
+The system is divided into two distinct technical layers that communicate with each other over the internet.
+
+• The Frontend (Client-Side Interface):
+  - What it is: The frontend is the visual component of the application installed on the user's device (accessed via a web browser). It is built using modern web frameworks (Next.js and React).
+  - Function: It is responsible for presenting data to the user, handling interactions (like clicking buttons and filling out the assessment questionnaire), and rendering the interactive Google Maps interface. It collects the inspector's inputs but does not perform the heavy calculations.
+
+• The Backend (Server-Side Logic & Database):
+  - What it is: The backend runs on secure cloud servers and consists of an API (Application Programming Interface) built with Python, and a Database managed by Supabase.
+  - Function: When the user submits a questionnaire from the frontend, the data travels to the backend. The backend securely stores this information in the database, processes the data through our mathematical and machine learning models, interacts with external AI services, and sends the final computed risk report back to the frontend for display.
+
+3. The Application Process Workflow
+-----------------------------------
+The typical workflow for an inspector using HAVEN-RVS involves the following sequential steps:
+
+1. Site Selection: The inspector logs in and drops a pin on the integrated map to register the exact geographical coordinates of the heritage house.
+2. Data Collection (Questionnaire): The user completes a comprehensive digital form categorizing the building's structural profile. This is divided into three metrics:
+   - Hazard: External threats (e.g., earthquake fault lines, typhoon zones).
+   - Vulnerability: The building's physical state (e.g., age, construction materials, visible cracks).
+   - Exposure: The human and historical value (e.g., occupancy count, historical significance).
+3. Risk Computation: Upon submission, the backend receives the data and passes it through the Machine Learning engine to calculate the score.
+4. AI Mitigation Generation: Simultaneously, the specific vulnerabilities identified are sent to the AI engine to draft a custom action plan.
+5. Final Report & Export: The frontend combines the Machine Learning score and the AI-generated action plan into a single dashboard. The user can then export this as a formatted PDF or Excel document.
+
+4. The Machine Learning Engine: Why XGBoost?
+--------------------------------------------
+To calculate the structural risk, HAVEN-RVS uses a specific Machine Learning model called XGBoost (eXtreme Gradient Boosting).
+
+• The Dual-Engine Approach:
+  We use two separate XGBoost models working together:
+  1. Regressor Model: Predicts the exact continuous Risk Index (a specific number from 0 to 10).
+  2. Classifier Model: Categorizes that score into a strict Risk Level (Low, Moderate, or High Risk).
+
+• Model Comparison: Why XGBoost over others?
+  During development, we tested three different mathematical models on our dataset of 150,000 structural profiles.
+  
+  - Linear Regression (Accuracy/R2: ~97.0%): This is a standard statistical model. While fast, it assumes a simple, straight-line relationship between variables. It struggled because structural risk is "multiplicative" (Hazard × Vulnerability × Exposure), which is a complex, non-linear relationship.
+  - Random Forest (Accuracy/R2: ~98.6%): This is an advanced model that builds multiple independent "decision trees" and averages their results. It handled the complex data much better than Linear Regression but still lacked the extreme precision required for an exact decimal score.
+  - XGBoost (Accuracy/R2: ~99.7%): This is the model we deployed in production. Unlike Random Forest, which builds trees independently, XGBoost builds trees sequentially. Each new tree specifically targets and mathematically corrects the exact errors made by the previous trees (a process called "gradient boosting"). This achieved the highest precision, capturing 99.7% of the variance in our structural engineering formulas.
+
+• Explainability (No "Black Boxes"):
+  In structural engineering, you cannot rely on a "black box" algorithm (like a Deep Learning Neural Network) that gives an answer but cannot explain its reasoning. XGBoost allows for clear "Feature Importance." We can trace exactly which specific questionnaire inputs (e.g., "termite damage" or "unreinforced masonry") contributed most to the final high-risk score, ensuring transparency and accountability.
+
+5. The Implementation of Generative AI (Google Gemini)
+------------------------------------------------------
+It is crucial to differentiate the role of Machine Learning from the role of Generative AI in this system.
+
+• Machine Learning (XGBoost) handles the quantitative analysis. It processes the math based on historical patterns and outputs the precise Risk Score (e.g., "Risk Index: 8.5").
+• Generative AI (Google Gemini) handles the qualitative analysis. It processes language and context, and outputs human-readable recommendations.
+
+• Why we implemented AI for the assessment:
+  If the system only relied on Machine Learning, it would accurately flag a building as "High Risk," but the structural engineer would still have to manually type out a lengthy, technical mitigation plan explaining how to fix it. 
+  
+  By integrating Google Gemini, the system automatically reads the exact structural flaws the inspector selected on the questionnaire (e.g., "wooden columns in poor condition" or "high earthquake hazard") and instantly drafts a professional, customized "Course of Action." This automates the most time-consuming part of the inspection process: report writing. The AI synthesizes the raw data inputs into actionable, structured engineering advice, ensuring that the final output is not just a score, but a comprehensive solution.

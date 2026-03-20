@@ -341,11 +341,13 @@ plt.savefig('figures/feature_importance.png')
 plt.close()
 
 # --- EXPORT ---
-os.makedirs('model_exports', exist_ok=True)
-reg.save_model('model_exports/best_model.json')
-clf.save_model('model_exports/classifier_model.json')
-pickle.dump(scaler, open('model_exports/scaler.pkl', 'wb'))
+base_dir = os.path.dirname(os.path.abspath(__file__))
+export_path = os.path.join(base_dir, 'model_exports')
+os.makedirs(export_path, exist_ok=True)
+reg.save_model(os.path.join(export_path, 'best_model.json'))
+clf.save_model(os.path.join(export_path, 'classifier_model.json'))
+pickle.dump(scaler, open(os.path.join(export_path, 'scaler.pkl'), 'wb'))
 le = LabelEncoder().fit(['LOW RISK', 'MODERATE RISK', 'HIGH RISK'])
-pickle.dump(le, open('model_exports/label_encoder.pkl', 'wb'))
+pickle.dump(le, open(os.path.join(export_path, 'label_encoder.pkl'), 'wb'))
 
 print(f'\n✅ Hybrid Training Complete. (Real: {len(real_data_list)}, Synthetic: {SYNTHETIC_SAMPLES})')
