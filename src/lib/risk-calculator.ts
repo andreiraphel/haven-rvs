@@ -90,7 +90,8 @@ export function calculateAssessmentRisk(
   const score = isDangerStub ? 3 : 2;
   const b1 = (e?.b11 ?? score) * we.b11 + (e?.b12 ?? score) * we.b12 + (e?.b13 ?? score) * we.b13 + (e?.b14 ?? score) * we.b14;
   
-  const age = 2024 - yearBuilt;
+  const currentYear = new Date().getFullYear();
+  const age = currentYear - yearBuilt;
   const ageScore = age <= 75 ? 1 : age <= 125 ? 2 : 3;
   const b2 = ageScore * we.b21 + (e?.b22 ?? score) * we.b22 + (e?.b23 ?? score) * we.b23 + (e?.b24 ?? score) * we.b24 + (e?.b25 ?? score) * we.b25;
   

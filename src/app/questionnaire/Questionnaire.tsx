@@ -656,7 +656,7 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
                 <div><label className="label-sm block mb-2">Longitude</label><input className="input-field" value={numInputs.longitude ?? building.longitude ?? ""} onChange={e => handleNum("longitude", e.target.value, setB)} /></div>
                 <div><label className="label-sm block mb-2">Building Type</label><select className="input-field" value={building.building_type ?? ""} onChange={e => setB("building_type", e.target.value)}><option value="">Select…</option><option>Timber Building</option><option>Concrete Building</option><option>Masonry Building</option></select></div>
                 <div><label className="label-sm block mb-2">Building Use</label><select className="input-field" value={building.building_use ?? ""} onChange={e => setB("building_use", e.target.value)}><option value="">Select…</option><option>Residential</option><option>Commercial</option><option>Mixed Use</option></select></div>
-                <div><label className="label-sm block mb-2">Floors</label><input className="input-field" value={numInputs.number_of_floors ?? building.number_of_floors ?? ""} onChange={e => handleNum("number_of_floors", e.target.value, setB)} /></div>
+                <div><label className="label-sm block mb-2">Floors</label><input className="input-field" value={numInputs.number_of_floors ?? building.number_of_floors ?? ""} onChange={e => { handleNum("number_of_floors", e.target.value, setB); handleNum("number_of_stories", e.target.value, setV); }} /></div>
               </div>
               <div className="flex justify-end pt-2"><button className="btn-primary w-full sm:w-auto" onClick={() => setStep("hazard")}>Next: Hazard →</button></div>
             </div>
@@ -699,7 +699,7 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
               </Section>
 
               <Section title="B2 — Historical Value">
-                <QField label="B2.1 Age of Building" sub="Low (50-75) ; Moderate (76 to 125) ; High (126+ years)">
+                <QField label={`B2.1 Age of Building (Current Year: ${currentYear})`} sub="Low (50-75) ; Moderate (76 to 125) ; High (126+ years)">
                   <div className="text-sm font-bold text-terracotta bg-sand px-3 py-2 rounded-lg border border-bark/20 inline-block">
                     {currentYear - Number(building.year_built ?? currentYear)} years old
                   </div>
@@ -737,7 +737,7 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
                 <QField label="C1.2 Plan Irregularity" sub="Low (Regular) ; Moderate (Symmetric T,U,C) ; High (L-shaped)"><QualitativeSelect multiple value={vuln.plan_irregularity ?? []} options={["Rectangular", "Square", "T- shaped", "Irregular Shaped", "L-shaped"]} onChange={v => setV("plan_irregularity",v)} /></QField>
                 <QField label="C1.3 Vertical Irregularity" sub="Low (None) ; Moderate (1) ; High (2+)"><QualitativeSelect value={vuln.vertical_irregularity ?? ""} options={["No vertical irregularity", "1 Vertical Irregularity", "2 Vertical Irregularities"]} onChange={v => setV("vertical_irregularity",v)} /></QField>
                 <QField label="C1.4 Proximity / Pounding" sub="Low (No adjacent building) ; Moderate (Adequate-more than 6 inches) ; High (Not adequate- less than 6 inches)"><QualitativeSelect value={vuln.building_proximity ?? ""} options={["No adjacent buildings", "6 inches and above", "below 6 inches"]} onChange={v => setV("building_proximity",v)} /></QField>
-                <QField label="C1.5 Number of Storeys" sub="Low (1) ; Moderate (2) ; High (3+)"><input className="input-field" value={numInputs.number_of_stories ?? vuln.number_of_stories ?? ""} onChange={e => handleNum("number_of_stories", e.target.value, setV)} /></QField>
+                <QField label="C1.5 Number of Storeys" sub="Low (1) ; Moderate (2) ; High (3+)"><input className="input-field bg-sand cursor-not-allowed opacity-70" readOnly value={numInputs.number_of_stories ?? vuln.number_of_stories ?? ""} title="Automatically synced from Building Info (Floors)" /></QField>
                 <QField label="C1.6 System Material" sub="Low (Timber Frame and Light Steel Frame) ; Moderate (Reinforced Concrete and Steel) ; High (Unreinforced Masonry)"><QualitativeSelect multiple value={vuln.structural_material ?? []} options={["Timber Frame","Light Steel Frame","Reinforced Concrete","Steel","Unreinforced Masonry"]} onChange={v => setV("structural_material",v)} /></QField>
                 <QField label="C1.7 Number of Bays" sub="Low (5+) ; Moderate (3-4) ; High (<3)"><input className="input-field" value={numInputs.number_of_bays ?? vuln.number_of_bays ?? ""} onChange={e => handleNum("number_of_bays", e.target.value, setV)} /></QField>
                 <QField label="C1.8 Column Spacing (m)" sub="Low (<3m) ; Moderate (3-5m) ; High (>5m)"><input className="input-field" value={numInputs.column_spacing_m ?? vuln.column_spacing_m ?? ""} onChange={e => handleNum("column_spacing_m", e.target.value, setV)} /></QField>

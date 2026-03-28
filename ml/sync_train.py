@@ -1,8 +1,10 @@
 import pandas as pd
 import numpy as np
 import pickle
+import time
 import os
 import requests
+import datetime
 from dotenv import load_dotenv
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -54,7 +56,7 @@ BASE_MAP = {"Base is higher": 1, "Same Level": 2, "Base is lower": 3}
 DRAIN_MAP = {"Closed drainage system": 1, "Open drainage system": 2, "No Drainage System": 3}
 def get_age_score(year):
     try:
-        age = 2024 - int(year)
+        age = datetime.datetime.now().year - int(year)
         return 1 if age <= 75 else 2 if age <= 125 else 3
     except: return 1
 CODE_MAP = {"New Code (1992-present)": 1, "Post-Code (1972-1991)": 2, "Pre-Code (before 1972)": 3}        
