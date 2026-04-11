@@ -206,5 +206,3 @@ export async function exportToPDF(assessments: Assessment[]) {
 
   doc.save(`HAVEN-RVS_Risk_Summary_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
-).toISOString().slice(0, 10)}.pdf`);
-}
