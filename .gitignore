@@ -20,3 +20,6 @@ ml/figures/*.jpg
 Thumbs.db
 ~$*
 *.~*
+# Ignore all markdown files except README.md
+*.md
+!README.md
