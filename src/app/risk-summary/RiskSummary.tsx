@@ -361,18 +361,18 @@ function DetailModal({ assessment: a, onClose, router }: { assessment: Assessmen
       {/* 2. Primary Statistical Result (Hero Box) */}
       <div className={`rounded-xl border p-6 mb-8 flex flex-col md:flex-row items-center gap-8 ${riskCls}`}>
         <div className="flex flex-col items-center text-center md:min-w-[240px] md:pr-8 md:border-r border-current/20">
-          <div className="text-[10px] font-bold uppercase tracking-[0.2em] mb-2 opacity-70 text-current">Statistical Risk Index</div>
+          <div className="text-[10px] font-bold uppercase tracking-[0.2em] mb-2 opacity-70 text-current">Manual Verification</div>
           <div className="font-sora font-extrabold text-7xl leading-none mb-2">
-            {a.result.risk_index?.toFixed(4) ?? "—"}
+            {a.result.manual_index?.toFixed(4) ?? a.result.risk_index?.toFixed(4) ?? "—"}
           </div>
           <div className="text-sm font-bold uppercase tracking-widest">{rc}</div>
         </div>
         
         <div className="flex-1 w-full flex flex-wrap md:flex-nowrap justify-between gap-6 px-4">
           <div className="flex flex-col justify-center min-w-[100px]">
-            <span className="text-[10px] uppercase font-bold opacity-60 mb-1 leading-tight">Manual<br/>Verification</span>
+            <span className="text-[10px] uppercase font-bold opacity-60 mb-1 leading-tight">Statistical<br/>Risk Index</span>
             <span className="text-xl font-bold border-t border-current/10 pt-1">
-              {a.result.manual_index?.toFixed(4) ?? a.result.risk_index?.toFixed(4) ?? "—"}
+              {a.result.risk_index?.toFixed(4) ?? "—"}
             </span>
           </div>
           
