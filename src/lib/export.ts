@@ -92,6 +92,8 @@ export async function exportToExcel(assessments: Assessment[]) {
       h_fault: a.hazard.fault_distance_km,
       h_liq:   a.hazard.potential_liquefaction,
       h_wind:  a.hazard.basic_wind_speed_kph,
+      h_flood: a.hazard.flood_susceptibility,
+      h_storm: a.hazard.storm_surge_height,
       h_elev:  a.hazard.elevation_m,
 
       v_mat:     a.vulnerability.structural_material,
@@ -203,4 +205,6 @@ export async function exportToPDF(assessments: Assessment[]) {
   });
 
   doc.save(`HAVEN-RVS_Risk_Summary_${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+).toISOString().slice(0, 10)}.pdf`);
 }

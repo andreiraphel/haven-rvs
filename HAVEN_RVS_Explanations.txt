@@ -31,6 +31,6 @@ The numerical rating is derived from a strict mathematical formulation that eval
 *   **Calculation Method:** Each indicator receives a weighted rating score (maximum of 3.0). The raw Risk Rating is calculated as the multiplicative product of the three: `Hazard Rating × Exposure Rating × Vulnerability Rating`. 
 *   **Normalization:** Since the maximum possible raw score is 27 (3 × 3 × 3), the value is mathematically normalized to a standard 0 to 10 scale using the formula: `(Risk Rating / 27) * 10`.
 *   **Categorical Thresholds:** This resulting 0-10 Risk Index directly maps to the categorical Risk Level based on specific engineering thresholds:
-    *   **LOW RISK:** 0.00 to 3.58
-    *   **MODERATE RISK:** 3.59 to 6.79
-    *   **HIGH RISK:** 6.80 to 10.00
+    *   **LOW RISK:** 0.00 to 1.9
+    *   **MODERATE RISK:** 2.0 to 6.1
+    *   **HIGH RISK:** 6.2 to 10.00

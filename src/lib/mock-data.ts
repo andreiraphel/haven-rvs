@@ -15,6 +15,7 @@ export const MOCK_ASSESSMENTS: Assessment[] = [
       fault_distance_km: 9.71, fault_name: "East Bohol Fault",
       seismic_source_type: 7.0, potential_liquefaction: "Safe",
       basic_wind_speed_kph: 260, terrain: "Minimal Obstruction",
+      flood_susceptibility: "Low Susceptibility", storm_surge_height: "1.0 m- 2.0 m",
       slope_degrees: "1-8 degrees", elevation_m: 17.93,
       distance_to_water_m: 518.7, surface_runoff: "Concrete",
       base_height: "Same Level", drainage_system: "No Drainage System",
@@ -107,6 +108,7 @@ export const MOCK_ASSESSMENTS: Assessment[] = [
       fault_distance_km: 13.09, fault_name: "East Bohol Fault",
       seismic_source_type: 7.0, potential_liquefaction: "Least Susceptible",
       basic_wind_speed_kph: 270, terrain: "Minimal Obstruction",
+      flood_susceptibility: "Moderate Susceptibility", storm_surge_height: "2.1 m- 3.0 m",
       slope_degrees: "1-8 degrees", elevation_m: 304.4,
       distance_to_water_m: 2585.7, surface_runoff: "Grass/Concrete",
       base_height: "Same Level", drainage_system: "Open drainage system",
@@ -199,6 +201,7 @@ export const MOCK_ASSESSMENTS: Assessment[] = [
       fault_distance_km: 12.82, fault_name: "East Bohol Fault",
       seismic_source_type: 7.0, potential_liquefaction: "Highly Susceptible",
       basic_wind_speed_kph: 260, terrain: "Minimal Obstruction",
+      flood_susceptibility: "Low Susceptibility", storm_surge_height: "1.0 m- 2.0 m",
       slope_degrees: "1-8 degrees", elevation_m: 12.4,
       distance_to_water_m: 95.0, surface_runoff: "Concrete",
       base_height: "Same Level", drainage_system: "No Drainage System",
@@ -284,5 +287,8 @@ export function getStats() {
   const low = MOCK_ASSESSMENTS.filter(a => a.result.risk_description === "LOW RISK").length;
   const mod = MOCK_ASSESSMENTS.filter(a => a.result.risk_description === "MODERATE RISK").length;
   const high = MOCK_ASSESSMENTS.filter(a => a.result.risk_description === "HIGH RISK").length;
+  return { total, low, mod, high };
+}
+a.result.risk_description === "HIGH RISK").length;
   return { total, low, mod, high };
 }

@@ -100,6 +100,8 @@ def get_wind_score(v):
     try: return 1 if float(v) <= 225 else 2 if float(v) <= 279 else 3
     except: return 1
 TERRAIN_MAP = {"Numerous Obstruction": 1, "Minimal Obstruction": 2, "Flat Terrain": 3}
+FLOOD_MAP = {"Low Susceptibility": 1, "Moderate Susceptibility": 2, "High Susceptibility": 3}
+STORM_SURGE_MAP = {"1.0 m- 2.0 m": 1, "2.1 m- 3.0 m": 2, "3.0 m and above": 3}
 SLOPE_MAP = {"1-8 degrees": 1, "9-30 degrees": 2, "31-60 degrees": 3, "above 60 degrees": 3}
 def get_elevation_score(v):
     try: return 1 if float(v) > 10 else 2 if float(v) >= 5 else 3
@@ -165,6 +167,8 @@ def encode_inputs(hazard: dict, vulnerability: dict, exposure: dict = None, year
     liq = LIQ_MAP.get(h.get("potential_liquefaction"), 2)
     wind = get_wind_score(h.get("basic_wind_speed_kph", 260))
     terrain = TERRAIN_MAP.get(h.get("terrain"), 2)
+    flood = FLOOD_MAP.get(h.get("flood_susceptibility"), 1)
+    storm = STORM_SURGE_MAP.get(h.get("storm_surge_height"), 1)
     slope = SLOPE_MAP.get(h.get("slope_degrees"), 1)
     elev = get_elevation_score(h.get("elevation_m", 12))
     water = get_water_dist_score(h.get("distance_to_water_m", 500))
@@ -197,7 +201,7 @@ def encode_inputs(hazard: dict, vulnerability: dict, exposure: dict = None, year
         return max([mapping.get(x, default_val) for x in val]) if val else default_val
 
     return [
-        peis, fault, source, liq, wind, terrain, slope, elev, water, runoff, base, drain,
+        peis, fault, source, liq, wind, terrain, flood, storm, slope, elev, water, runoff, base, drain,
         b11, b12, b13, b14, age_s, b22, b23, b24, b25, b31, b32, b33, b34, b41, b42, b43, b44,
         CODE_MAP.get(v.get("building_code"), 2), get_max(v.get("plan_irregularity"), PLAN_MAP, 1), VERT_MAP.get(v.get("vertical_irregularity"), 1), PROX_MAP.get(v.get("building_proximity"), 1), (3 if stories >= 3 else stories), get_max(v.get("structural_material"), MAT_MAP, 2), (1 if bays >= 5 else 2 if bays >= 3 else 3), (1 if spacing < 3 else 2 if spacing <= 5 else 3), get_max(v.get("building_enclosure"), ENCL_MAP, 1), get_max(v.get("wall_material"), WALL_MAP, 2), get_max(v.get("structural_framing_type"), FRAME_MAP, 3), get_max(v.get("flooring_material"), FLOOR_MAP, 1),
         get_crack_score(v.get("maximum_crack")), (3 if v.get("uneven_settlement") else 1), (3 if v.get("beam_column_deformations") else 1), (3 if v.get("finishing_condition") else 1), (3 if v.get("decay_of_structural_member") else 1), (3 if v.get("additional_loads") else 1),
@@ -223,7 +227,7 @@ def predict(req: PredictRequest):
 
         a1 = (get_peis_score(h.get("earthquake_intensity")) * wh['earthquake_intensity']) + (get_fault_score(h.get("fault_distance_km", 10)) * wh['fault_distance']) + (get_source_score(h.get("seismic_source_type", 7.0)) * wh['seismic_source']) + (LIQ_MAP.get(h.get("potential_liquefaction"), 2) * wh['liquefaction'])
         a2 = (get_wind_score(h.get("basic_wind_speed_kph", 260)) * wh['wind_speed']) + (TERRAIN_MAP.get(h.get("terrain"), 2) * wh['terrain'])
-        a3 = (SLOPE_MAP.get(h.get("slope_degrees"), 1) * wh['slope']) + (get_elevation_score(h.get("elevation_m", 12)) * wh['elevation']) + (get_water_dist_score(h.get("distance_to_water_m", 500)) * wh['water_distance']) + (runoff * wh['runoff']) + (BASE_MAP.get(h.get("base_height"), 2) * wh['base_height']) + (DRAIN_MAP.get(h.get("drainage_system"), 3) * wh['drainage'])
+        a3 = (FLOOD_MAP.get(h.get("flood_susceptibility"), 1) * wh.get('flood', 0.3576)) + (STORM_SURGE_MAP.get(h.get("storm_surge_height"), 1) * wh.get('storm_surge', 0.2332)) + (SLOPE_MAP.get(h.get("slope_degrees"), 1) * wh.get('slope', 0.0508)) + (get_elevation_score(h.get("elevation_m", 12)) * wh.get('elevation', 0.0681)) + (get_water_dist_score(h.get("distance_to_water_m", 500)) * wh.get('water_distance', 0.0762)) + (runoff * wh.get('runoff', 0.0920)) + (BASE_MAP.get(h.get("base_height"), 2) * wh.get('base_height', 0.0478)) + (DRAIN_MAP.get(h.get("drainage_system"), 3) * wh.get('drainage', 0.0742))
         h_rating = np.mean([a1, a2, a3])
 
         if e:
@@ -269,7 +273,7 @@ def predict(req: PredictRequest):
             cat_idx = int(model_clf.predict(X_scaled)[0])
             ml_cat = le.inverse_transform([cat_idx])[0]
 
-        desc = "LOW RISK" if manual_idx <= 3.58 else "MODERATE RISK" if manual_idx <= 6.79 else "HIGH RISK"
+        desc = "LOW RISK" if manual_idx <= 1.9 else "MODERATE RISK" if manual_idx <= 6.1 else "HIGH RISK"
         return {
             "risk_index": round(float(manual_idx), 6), "risk_description": desc,
             "hazard_rating": round(float(h_rating), 6), "vulnerability_rating": round(float(v_rating), 6),

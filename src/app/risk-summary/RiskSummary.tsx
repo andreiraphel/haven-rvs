@@ -463,6 +463,8 @@ function DetailModal({ assessment: a, onClose, router }: { assessment: Assessmen
             <DataRow label="Liquefaction Susceptibility" val={a.hazard.potential_liquefaction} />
             <DataRow label="Basic Wind Speed" val={`${a.hazard.basic_wind_speed_kph} kph`} />
             <DataRow label="Terrain" val={a.hazard.terrain} />
+            <DataRow label="Flood Susceptibility" val={a.hazard.flood_susceptibility} />
+            <DataRow label="Storm Surge Height" val={a.hazard.storm_surge_height} />
             <DataRow label="Slope" val={a.hazard.slope_degrees} />
             <DataRow label="Elevation" val={`${a.hazard.elevation_m} m`} />
             <DataRow label="Distance to Water" val={`${a.hazard.distance_to_water_m} m`} />

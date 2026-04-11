@@ -1,11 +1,11 @@
 import type { HazardIndicators, VulnerabilityIndicators, RiskResult, ExposureIndicators } from "@/types";
-import { PEIS_MAP, LIQ_MAP, TERRAIN_MAP, SLOPE_MAP, RUNOFF_MAP, BASE_MAP, DRAIN_MAP, CODE_MAP, PLAN_MAP, VERT_MAP, PROX_MAP, MAT_MAP, FRAME_MAP, ENCL_MAP, WALL_MAP, FLOOR_MAP, ROOF_DESIGN_MAP, ROOF_SLOPE_MAP, ROOF_MAT_MAP, FAST_TYPE_MAP } from "./maps";
+import { PEIS_MAP, LIQ_MAP, TERRAIN_MAP, FLOOD_MAP, STORM_SURGE_MAP, SLOPE_MAP, RUNOFF_MAP, BASE_MAP, DRAIN_MAP, CODE_MAP, PLAN_MAP, VERT_MAP, PROX_MAP, MAT_MAP, FRAME_MAP, ENCL_MAP, WALL_MAP, FLOOR_MAP, ROOF_DESIGN_MAP, ROOF_SLOPE_MAP, ROOF_MAT_MAP, FAST_TYPE_MAP } from "./maps";
 
 export interface RiskWeights {
   hazard: {
     earthquake_intensity: number; fault_distance: number; seismic_source: number; liquefaction: number;
     wind_speed: number; terrain: number;
-    slope: number; elevation: number; water_distance: number; runoff: number; base_height: number; drainage: number;
+    flood: number; storm_surge: number; slope: number; elevation: number; water_distance: number; runoff: number; base_height: number; drainage: number;
   };
   exposure: {
     b11: number; b12: number; b13: number; b14: number;
@@ -27,7 +27,7 @@ export const DEFAULT_WEIGHTS: RiskWeights = {
   hazard: {
     earthquake_intensity: 0.0578, fault_distance: 0.402, seismic_source: 0.1455, liquefaction: 0.3947,
     wind_speed: 0.6586, terrain: 0.3414,
-    slope: 0.1119, elevation: 0.1656, water_distance: 0.1376, runoff: 0.2844, base_height: 0.1184, drainage: 0.182
+    flood: 0.3576, storm_surge: 0.2332, slope: 0.0508, elevation: 0.0681, water_distance: 0.0762, runoff: 0.0920, base_height: 0.0478, drainage: 0.0742
   },
   exposure: {
     b11: 0.2461, b12: 0.2299, b13: 0.3621, b14: 0.1619,
@@ -77,7 +77,9 @@ export function calculateAssessmentRisk(
   const a2 = (h.basic_wind_speed_kph <= 225 ? 1 : h.basic_wind_speed_kph <= 279 ? 2 : 3) * wh.wind_speed +
              (TERRAIN_MAP[h.terrain] ?? 2) * wh.terrain;
 
-  const a3 = (SLOPE_MAP[h.slope_degrees] ?? 1) * wh.slope +
+  const a3 = (FLOOD_MAP[h.flood_susceptibility] ?? 1) * wh.flood +
+             (STORM_SURGE_MAP[h.storm_surge_height] ?? 1) * wh.storm_surge +
+             (SLOPE_MAP[h.slope_degrees] ?? 1) * wh.slope +
              (h.elevation_m > 10 ? 1 : h.elevation_m >= 5 ? 2 : 3) * wh.elevation +
              (h.distance_to_water_m > 500 ? 1 : h.distance_to_water_m >= 200 ? 2 : 3) * wh.water_distance +
              (getMaxScore(h.surface_runoff, RUNOFF_MAP, 1)) * wh.runoff +
@@ -150,7 +152,7 @@ export function calculateAssessmentRisk(
   const riskRating = hazardRating * exposureRating * vulnerabilityRating;
   const riskIndex = (riskRating / 27) * 10;
 
-  const riskDescription = riskIndex <= 3.58 ? "LOW RISK" : riskIndex <= 6.79 ? "MODERATE RISK" : "HIGH RISK";
+  const riskDescription = riskIndex <= 1.9 ? "LOW RISK" : riskIndex <= 6.1 ? "MODERATE RISK" : "HIGH RISK";
 
   return {
     building_id: "",

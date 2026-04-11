@@ -44,6 +44,8 @@ def get_wind_score(v):
     try: return 1 if float(v) <= 225 else 2 if float(v) <= 279 else 3
     except: return 1
 TERRAIN_MAP = {"Numerous Obstruction": 1, "Minimal Obstruction": 2, "Flat Terrain": 3}
+FLOOD_MAP = {"Low Susceptibility": 1, "Moderate Susceptibility": 2, "High Susceptibility": 3}
+STORM_SURGE_MAP = {"1.0 m- 2.0 m": 1, "2.1 m- 3.0 m": 2, "3.0 m and above": 3}
 SLOPE_MAP = {"1-8 degrees": 1, "9-30 degrees": 2, "31-60 degrees": 3, "above 60 degrees": 3}
 def get_elevation_score(v):
     try: return 1 if float(v) > 10 else 2 if float(v) >= 5 else 3
@@ -139,6 +141,8 @@ def encode_real_building(b, h, v, e):
     liq = LIQ_MAP.get(h.get("potential_liquefaction"), 2)
     wind = get_wind_score(h.get("basic_wind_speed_kph", 260))
     terrain = TERRAIN_MAP.get(h.get("terrain"), 2)
+    flood = FLOOD_MAP.get(h.get("flood_susceptibility"), 1)
+    storm = STORM_SURGE_MAP.get(h.get("storm_surge_height"), 1)
     slope = SLOPE_MAP.get(h.get("slope_degrees"), 1)
     elev = get_elevation_score(h.get("elevation_m", 12))
     water = get_water_dist_score(h.get("distance_to_water_m", 500))
@@ -173,7 +177,7 @@ def encode_real_building(b, h, v, e):
     f_dist = 1 if f_dist_val <= 225 else 2 if f_dist_val <= 450 else 3
 
     return [
-        peis, fault, source, liq, wind, terrain, slope, elev, water, runoff, base, drain,
+        peis, fault, source, liq, wind, terrain, flood, storm, slope, elev, water, runoff, base, drain,
         b11, b12, b13, b14, age_s, b22, b23, b24, b25, b31, b32, b33, b34, b41, b42, b43, b44,
         CODE_MAP.get(v.get("building_code"), 2), get_max(v.get("plan_irregularity"), PLAN_MAP, 1), VERT_MAP.get(v.get("vertical_irregularity"), 1), PROX_MAP.get(v.get("building_proximity"), 1), (3 if stories >= 3 else stories), get_max(v.get("structural_material"), MAT_MAP, 2), (1 if bays >= 5 else 2 if bays >= 3 else 3), (1 if spacing < 3 else 2 if spacing <= 5 else 3), get_max(v.get("building_enclosure"), ENCL_MAP, 1), get_max(v.get("wall_material"), WALL_MAP, 2), get_max(v.get("structural_framing_type"), FRAME_MAP, 3), get_max(v.get("flooring_material"), FLOOR_MAP, 1),
         get_crack_score(v.get("maximum_crack")), (3 if v.get("uneven_settlement") else 1), (3 if v.get("beam_column_deformations") else 1), (3 if v.get("finishing_condition") else 1), (3 if v.get("decay_of_structural_member") else 1), (3 if v.get("additional_loads") else 1),
@@ -182,27 +186,27 @@ def encode_real_building(b, h, v, e):
     ]
 
 def compute_label(feats):
-    # feats is a list of 52 values (1-3)
+    # feats is a list of 54 values (1-3)
     # Mapping must match index positions from generate_data
-    # a1: 0-3, a2: 4-5, a3: 6-11
-    # b1: 12-15, b2: 16-20, b3: 21-24, b4: 25-28
-    # c1: 29-40, c2: 41-46, c3: 47-49, c4: 50-51
+    # a1: 0-3, a2: 4-5, a3: 6-13
+    # b1: 14-17, b2: 18-22, b3: 23-26, b4: 27-30
+    # c1: 31-42, c2: 43-48, c3: 49-51, c4: 52-53
     
     a1 = np.array(feats[0:4]) @ np.array([H_W['earthquake_intensity'], H_W['fault_distance'], H_W['seismic_source'], H_W['liquefaction']])
     a2 = np.array(feats[4:6]) @ np.array([H_W['wind_speed'], H_W['terrain']])
-    a3 = np.array(feats[6:12]) @ np.array([H_W['slope'], H_W['elevation'], H_W['water_distance'], H_W['runoff'], H_W['base_height'], H_W['drainage']])
+    a3 = np.array(feats[6:14]) @ np.array([H_W['flood'], H_W['storm_surge'], H_W['slope'], H_W['elevation'], H_W['water_distance'], H_W['runoff'], H_W['base_height'], H_W['drainage']])
     H = (a1 + a2 + a3) / 3.0
     
-    b1 = np.array(feats[12:16]) @ np.array([E_W['b11'], E_W['b12'], E_W['b13'], E_W['b14']])
-    b2 = np.array(feats[16:21]) @ np.array([E_W['b21'], E_W['b22'], E_W['b23'], E_W['b24'], E_W['b25']])
-    b3 = np.array(feats[21:25]) @ np.array([E_W['b31'], E_W['b32'], E_W['b33'], E_W['b34']])
-    b4 = np.array(feats[25:29]) @ np.array([E_W['b41'], E_W['b42'], E_W['b43'], E_W['b44']])
+    b1 = np.array(feats[14:18]) @ np.array([E_W['b11'], E_W['b12'], E_W['b13'], E_W['b14']])
+    b2 = np.array(feats[18:23]) @ np.array([E_W['b21'], E_W['b22'], E_W['b23'], E_W['b24'], E_W['b25']])
+    b3 = np.array(feats[23:27]) @ np.array([E_W['b31'], E_W['b32'], E_W['b33'], E_W['b34']])
+    b4 = np.array(feats[27:31]) @ np.array([E_W['b41'], E_W['b42'], E_W['b43'], E_W['b44']])
     E = (b1 + b2 + b3 + b4) / 4.0
     
-    c1 = np.array(feats[29:41]) @ np.array([V_W['building_code'], V_W['plan_irregularity'], V_W['vertical_irregularity'], V_W['building_proximity'], V_W['stories'], V_W['material'], V_W['bays'], V_W['column_spacing'], V_W['enclosure'], V_W['wall_material'], V_W['framing'], V_W['flooring']])
-    c2 = np.array(feats[41:47]) @ np.array([V_W['crack'], V_W['settlement'], V_W['deformations'], V_W['finishing'], V_W['decay'], V_W['loads']])
-    c3 = np.array(feats[47:50]) @ np.array([V_W['roof_design'], V_W['roof_slope'], V_W['roof_material']])
-    c4 = np.array(feats[50:52]) @ np.array([V_W['roof_fastener_type'], V_W['roof_fastener_dist']])
+    c1 = np.array(feats[31:43]) @ np.array([V_W['building_code'], V_W['plan_irregularity'], V_W['vertical_irregularity'], V_W['building_proximity'], V_W['stories'], V_W['material'], V_W['bays'], V_W['column_spacing'], V_W['enclosure'], V_W['wall_material'], V_W['framing'], V_W['flooring']])
+    c2 = np.array(feats[43:49]) @ np.array([V_W['crack'], V_W['settlement'], V_W['deformations'], V_W['finishing'], V_W['decay'], V_W['loads']])
+    c3 = np.array(feats[49:52]) @ np.array([V_W['roof_design'], V_W['roof_slope'], V_W['roof_material']])
+    c4 = np.array(feats[52:54]) @ np.array([V_W['roof_fastener_type'], V_W['roof_fastener_dist']])
     V = (c1 + c2 + c3 + c4) / 4.0
     
     idx = (H * E * V / 27.0) * 10.0
@@ -228,7 +232,7 @@ def generate_synthetic_data(n):
     target_per_class = n // 3
     print(f"🎯 Generating balanced synthetic dataset using vectorized computation...")
     
-    cols = [f'feat_{i}' for i in range(52)]
+    cols = [f'feat_{i}' for i in range(54)]
     all_dfs = []
     
     for p_dist in [
@@ -244,23 +248,23 @@ def generate_synthetic_data(n):
         # Vectorized Risk Calculation
         a1 = X_block[:, 0:4] @ np.array([H_W['earthquake_intensity'], H_W['fault_distance'], H_W['seismic_source'], H_W['liquefaction']])
         a2 = X_block[:, 4:6] @ np.array([H_W['wind_speed'], H_W['terrain']])
-        a3 = X_block[:, 6:12] @ np.array([H_W['slope'], H_W['elevation'], H_W['water_distance'], H_W['runoff'], H_W['base_height'], H_W['drainage']])
+        a3 = X_block[:, 6:14] @ np.array([H_W['flood'], H_W['storm_surge'], H_W['slope'], H_W['elevation'], H_W['water_distance'], H_W['runoff'], H_W['base_height'], H_W['drainage']])
         H = (a1 + a2 + a3) / 3.0
         
-        b1 = X_block[:, 12:16] @ np.array([E_W['b11'], E_W['b12'], E_W['b13'], E_W['b14']])
-        b2 = X_block[:, 16:21] @ np.array([E_W['b21'], E_W['b22'], E_W['b23'], E_W['b24'], E_W['b25']])
-        b3 = X_block[:, 21:25] @ np.array([E_W['b31'], E_W['b32'], E_W['b33'], E_W['b34']])
-        b4 = X_block[:, 25:29] @ np.array([E_W['b41'], E_W['b42'], E_W['b43'], E_W['b44']])
+        b1 = X_block[:, 14:18] @ np.array([E_W['b11'], E_W['b12'], E_W['b13'], E_W['b14']])
+        b2 = X_block[:, 18:23] @ np.array([E_W['b21'], E_W['b22'], E_W['b23'], E_W['b24'], E_W['b25']])
+        b3 = X_block[:, 23:27] @ np.array([E_W['b31'], E_W['b32'], E_W['b33'], E_W['b34']])
+        b4 = X_block[:, 27:31] @ np.array([E_W['b41'], E_W['b42'], E_W['b43'], E_W['b44']])
         E = (b1 + b2 + b3 + b4) / 4.0
         
-        c1 = X_block[:, 29:41] @ np.array([V_W['building_code'], V_W['plan_irregularity'], V_W['vertical_irregularity'], V_W['building_proximity'], V_W['stories'], V_W['material'], V_W['bays'], V_W['column_spacing'], V_W['enclosure'], V_W['wall_material'], V_W['framing'], V_W['flooring']])
-        c2 = X_block[:, 41:47] @ np.array([V_W['crack'], V_W['settlement'], V_W['deformations'], V_W['finishing'], V_W['decay'], V_W['loads']])
-        c3 = X_block[:, 47:50] @ np.array([V_W['roof_design'], V_W['roof_slope'], V_W['roof_material']])
-        c4 = X_block[:, 50:52] @ np.array([V_W['roof_fastener_type'], V_W['roof_fastener_dist']])
+        c1 = X_block[:, 31:43] @ np.array([V_W['building_code'], V_W['plan_irregularity'], V_W['vertical_irregularity'], V_W['building_proximity'], V_W['stories'], V_W['material'], V_W['bays'], V_W['column_spacing'], V_W['enclosure'], V_W['wall_material'], V_W['framing'], V_W['flooring']])
+        c2 = X_block[:, 43:49] @ np.array([V_W['crack'], V_W['settlement'], V_W['deformations'], V_W['finishing'], V_W['decay'], V_W['loads']])
+        c3 = X_block[:, 49:52] @ np.array([V_W['roof_design'], V_W['roof_slope'], V_W['roof_material']])
+        c4 = X_block[:, 52:54] @ np.array([V_W['roof_fastener_type'], V_W['roof_fastener_dist']])
         V = (c1 + c2 + c3 + c4) / 4.0
         
         idx = (H * E * V / 27.0) * 10.0
-        labels = np.where(idx <= 3.58, 0, np.where(idx <= 6.79, 1, 2))
+        labels = np.where(idx <= 1.9, 0, np.where(idx <= 6.1, 1, 2))
         
         df_block = pd.DataFrame(X_block, columns=cols)
         df_block['risk_index'] = idx

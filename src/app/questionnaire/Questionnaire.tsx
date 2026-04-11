@@ -546,8 +546,8 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
 
         // Determine description based on the Primary (ML) Index
         let finalDesc: RiskLevel = "LOW RISK";
-        if (primaryIndex <= 3.58) finalDesc = "LOW RISK";
-        else if (primaryIndex <= 6.79) finalDesc = "MODERATE RISK";
+        if (primaryIndex <= 1.9) finalDesc = "LOW RISK";
+        else if (primaryIndex <= 6.1) finalDesc = "MODERATE RISK";
         else finalDesc = "HIGH RISK";
 
         console.log("🏁 Finalizing Result...");
@@ -676,12 +676,14 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
                 <QField label="A2.2 Vicinity" sub="Low(Urban, Numerous Obstruction) ; Mod(Open, Minimum Obstruction) ; High(Flat Terrain, Unobstructed)"><QualitativeSelect value={hazard.terrain ?? ""} options={["Numerous Obstruction","Minimal Obstruction","Flat Terrain"]} onChange={v => setH("terrain",v)} /></QField>
               </Section>
               <Section title="A3 — Flood/Geo">
-                <QField label="A3.1 Slope" sub="Low(1-8°) ; Mod(9-30°) ; High(>30°)"><QualitativeSelect value={hazard.slope_degrees ?? ""} options={["1-8 degrees","9-30 degrees","31-60 degrees","above 60 degrees"]} onChange={v => setH("slope_degrees",v)} /></QField>
-                <QField label="A3.2 Elevation (m)" sub="Low(>10) ; Mod(5-10) ; High(<5)"><input className="input-field" value={numInputs.elevation_m ?? hazard.elevation_m ?? ""} onChange={e => handleNum("elevation_m", e.target.value, setH)} /></QField>
-                <QField label="A3.3 Dist. to Water (m)" sub="Low(>500) ; Mod(200-500) ; High(<200)"><input className="input-field" value={numInputs.distance_to_water_m ?? hazard.distance_to_water_m ?? ""} onChange={e => handleNum("distance_to_water_m", e.target.value, setH)} /></QField>
-                <QField label="A3.4 Surface" sub="Low(Lawn/Grass) ; Mod(Clay) ; High(Concrete/Asphalt/Brick)"><QualitativeSelect multiple value={hazard.surface_runoff ?? []} options={["Lawn","Grass","Clay","Concrete", "Asphalt", "Brick"]} onChange={v => setH("surface_runoff", v)} /></QField>
-                <QField label="A3.5 Base Height" sub="Low(Higher) ; Mod(Same) ; High(Lower)"><QualitativeSelect value={hazard.base_height ?? ""} options={["Base is higher","Same Level","Base is lower"]} onChange={v => setH("base_height",v)} /></QField>
-                <QField label="A3.6 Drainage" sub="Low(Regular Maintenance) ; Mod(Seldom to No Maintenance) ; High(No Drainage)"><QualitativeSelect value={hazard.drainage_system ?? ""} options={["Closed drainage system","Open drainage system","No Drainage System"]} onChange={v => setH("drainage_system",v)} /></QField>
+                <QField label="A3.1 Flood" sub="Low(Low Susceptibility) ; Mod(Moderate Susceptibility) ; High(High Susceptibility)"><QualitativeSelect value={hazard.flood_susceptibility ?? ""} options={["Low Susceptibility","Moderate Susceptibility","High Susceptibility"]} onChange={v => setH("flood_susceptibility",v)} /></QField>
+                <QField label="A3.2 Storm Surge" sub="Low(1.0 m- 2.0 m) ; Mod(2.1 m- 3.0 m) ; High(>3.0 m)"><QualitativeSelect value={hazard.storm_surge_height ?? ""} options={["1.0 m- 2.0 m","2.1 m- 3.0 m","3.0 m and above"]} onChange={v => setH("storm_surge_height",v)} /></QField>
+                <QField label="A3.3 Slope" sub="Low(1-8°) ; Mod(9-30°) ; High(>30°)"><QualitativeSelect value={hazard.slope_degrees ?? ""} options={["1-8 degrees","9-30 degrees","31-60 degrees","above 60 degrees"]} onChange={v => setH("slope_degrees",v)} /></QField>
+                <QField label="A3.4 Elevation (m)" sub="Low(>10) ; Mod(5-10) ; High(<5)"><input className="input-field" value={numInputs.elevation_m ?? hazard.elevation_m ?? ""} onChange={e => handleNum("elevation_m", e.target.value, setH)} /></QField>
+                <QField label="A3.5 Dist. to Water (m)" sub="Low(>500) ; Mod(200-500) ; High(<200)"><input className="input-field" value={numInputs.distance_to_water_m ?? hazard.distance_to_water_m ?? ""} onChange={e => handleNum("distance_to_water_m", e.target.value, setH)} /></QField>
+                <QField label="A3.6 Surface" sub="Low(Lawn/Grass) ; Mod(Clay) ; High(Concrete/Asphalt/Brick)"><QualitativeSelect multiple value={hazard.surface_runoff ?? []} options={["Lawn","Grass","Clay","Concrete", "Asphalt", "Brick"]} onChange={v => setH("surface_runoff", v)} /></QField>
+                <QField label="A3.7 Base Height" sub="Low(Higher) ; Mod(Same) ; High(Lower)"><QualitativeSelect value={hazard.base_height ?? ""} options={["Base is higher","Same Level","Base is lower"]} onChange={v => setH("base_height",v)} /></QField>
+                <QField label="A3.8 Drainage" sub="Low(Regular Maintenance) ; Mod(Seldom to No Maintenance) ; High(No Drainage)"><QualitativeSelect value={hazard.drainage_system ?? ""} options={["Closed drainage system","Open drainage system","No Drainage System"]} onChange={v => setH("drainage_system",v)} /></QField>
               </Section>
               <div className="flex justify-between pt-2"><button className="btn-secondary" onClick={() => setStep("building")}>← Back</button><button className="btn-primary" onClick={() => setStep("exposure")}>Next: Values →</button></div>
             </div>

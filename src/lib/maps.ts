@@ -1,6 +1,8 @@
 export const PEIS_MAP: Record<string, number> = { "I":1,"II":1,"III":1,"IV":1,"V":2,"VI":2,"VII":3,"VIII":3,"IX":3,"X":3 };
 export const LIQ_MAP: Record<string, number>  = { "Safe":1, "Least Susceptible":1, "Moderately Susceptible":2, "Highly Susceptible":3 };
 export const TERRAIN_MAP: Record<string, number> = { "Numerous Obstruction":1, "Minimal Obstruction":2, "Flat Terrain":3 };
+export const FLOOD_MAP: Record<string, number>   = { "Low Susceptibility":1, "Moderate Susceptibility":2, "High Susceptibility":3 };
+export const STORM_SURGE_MAP: Record<string, number> = { "1.0 m- 2.0 m":1, "2.1 m- 3.0 m":2, "3.0 m and above":3 };
 export const SLOPE_MAP: Record<string, number>   = { "1-8 degrees":1, "9-30 degrees":2, "31-60 degrees":3, "above 60 degrees":3 };
 export const RUNOFF_MAP: Record<string, number>  = { "Soil":1, "Lawn":1, "Grass":1, "Clay":2, "Concrete":3, "Asphalt":3, "Brick":3 };
 export const BASE_MAP: Record<string, number>    = { "Base is higher":1, "Same Level":2, "Base is lower":3 };

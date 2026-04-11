@@ -32,6 +32,8 @@ export interface HazardIndicators {
   basic_wind_speed_kph: number;
   terrain: string;                    // Minimal / Numerous Obstruction
   // A3 – Geo
+  flood_susceptibility: string;
+  storm_surge_height: string;
   slope_degrees: string;              // "1-8 degrees" | "9-30 degrees" etc.
   elevation_m: number;
   distance_to_water_m: number;

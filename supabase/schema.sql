@@ -72,9 +72,9 @@ begin
     values (
       '{
         "hazard": {
-          "earthquake_intensity": 0.224, "fault_distance": 0.185, "seismic_source": 0.364, "liquefaction": 0.227,
-          "wind_speed": 0.657, "terrain": 0.343,
-          "slope": 0.087, "elevation": 0.211, "water_distance": 0.175, "runoff": 0.269, "base_height": 0.140, "drainage": 0.118
+          "earthquake_intensity": 0.0578, "fault_distance": 0.4020, "seismic_source": 0.1455, "liquefaction": 0.3947,
+          "wind_speed": 0.6586, "terrain": 0.3414,
+          "flood": 0.3576, "storm_surge": 0.2332, "slope": 0.0508, "elevation": 0.0681, "water_distance": 0.0762, "runoff": 0.0920, "base_height": 0.0478, "drainage": 0.0742
         },
         "exposure": {
           "b11": 0.159, "b12": 0.168, "b13": 0.344, "b14": 0.329,
@@ -127,6 +127,8 @@ create table if not exists hazard_indicators (
   potential_liquefaction  text,
   basic_wind_speed_kph    double precision,
   terrain                 text,
+  flood_susceptibility    text,
+  storm_surge_height      text,
   slope_degrees           text,
   elevation_m             double precision,
   distance_to_water_m     double precision,
