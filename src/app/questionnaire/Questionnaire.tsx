@@ -35,7 +35,7 @@ function QualitativeSelect({
   const toggle = (opt: string) => {
     if (!multiple) {
       // single-select mode
-      onChange(opt)
+      onChange(value === opt ? "" : opt)
     } else {
       // multi-select mode
       const arr = Array.isArray(value) ? value : []
@@ -73,7 +73,7 @@ function QualitativeSelect({
   )
 }
 
-function SurveySelect({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+function SurveySelect({ value, onChange }: { value: number | undefined; onChange: (v: number | undefined) => void }) {
   const options = [
     { label: "Disagree", val: 1 },
     { label: "Neutral",  val: 2 },
@@ -85,7 +85,7 @@ function SurveySelect({ value, onChange }: { value: number; onChange: (v: number
         <button
           key={opt.val}
           type="button"
-          onClick={() => onChange(opt.val)}
+          onClick={() => onChange(value === opt.val ? undefined : opt.val)}
           className={`flex-1 py-2 rounded-lg border text-xs font-bold transition-all ${
             value === opt.val
               ? "bg-bark text-white border-bark shadow-sm"
@@ -139,12 +139,7 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
   }, []);
   const [hazard, setHazard]   = useState<Partial<HazardIndicators>>({});
   const [vuln, setVuln]       = useState<Partial<VulnerabilityIndicators>>({});
-  const [exposure, setExposure] = useState<Partial<ExposureIndicators>>({
-    b11: 2, b12: 2, b13: 2, b14: 2,
-    b21: 2, b22: 2, b23: 2, b24: 2, b25: 2,
-    b31: 2, b32: 2, b33: 2, b34: 2,
-    b41: 2, b42: 2, b43: 2, b44: 2
-  });
+  const [exposure, setExposure] = useState<Partial<ExposureIndicators>>({});
   const [isStubFilled, setIsStubFilled] = useState(false);
   const [result, setResult]   = useState<RiskResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -214,7 +209,7 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
   function setB(k: string, v: unknown) { setBuilding(f => ({ ...f, [k]: v })); }
   function setH(k: string, v: unknown) { setHazard(f => ({ ...f, [k]: v })); }
   function setV(k: string, v: unknown) { setVuln(f => ({ ...f, [k]: v })); }
-  function setE(k: string, v: number) { setExposure(f => ({ ...f, [k]: v })); }
+  function setE(k: string, v: number | undefined) { setExposure(f => ({ ...f, [k]: v })); }
   
   function handleNum(k: string, v: string, setter: (k: string, num: any) => void) {
     setNumInputs(prev => ({ ...prev, [k]: v }));
@@ -330,6 +325,83 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
     Object.entries(stubVuln).forEach(([k, v]) => { if (typeof v === 'number') strings[k] = String(v); });
     setNumInputs(strings);
   }
+
+  const validateStep = (currentStep: Step): boolean => {
+    setError(null);
+    const missing: string[] = [];
+
+    const check = (val: any, name: string) => {
+      if (val === undefined || val === null || val === "") {
+        missing.push(name);
+      } else if (Array.isArray(val) && val.length === 0) {
+        missing.push(name);
+      } else if (typeof val === "number" && isNaN(val)) {
+        missing.push(name);
+      }
+    };
+
+    if (currentStep === "building") {
+      check(building.name, "Building Name");
+      check(building.unique_code, "Unique Code");
+      check(building.year_built, "Year Built");
+      check(building.address, "Address");
+      check(building.municipality, "Municipality");
+      check(building.province, "Province");
+      check(building.latitude, "Latitude");
+      check(building.longitude, "Longitude");
+      check(building.building_type, "Building Type");
+      check(building.building_use, "Building Use");
+      check(building.number_of_floors, "Floors");
+    } else if (currentStep === "hazard") {
+      check(hazard.earthquake_intensity, "A1.1 Earthquake Intensity");
+      check(hazard.fault_distance_km, "A1.2 Fault Distance");
+      check(hazard.seismic_source_type, "A1.3 Source (Mw)");
+      check(hazard.potential_liquefaction, "A1.4 Liquefaction");
+      check(hazard.basic_wind_speed_kph, "A2.1 Wind Speed");
+      check(hazard.terrain, "A2.2 Vicinity");
+      check(hazard.flood_susceptibility, "A3.1 Flood");
+      check(hazard.storm_surge_height, "A3.2 Storm Surge");
+      check(hazard.slope_degrees, "A3.3 Slope");
+      check(hazard.elevation_m, "A3.4 Elevation");
+      check(hazard.distance_to_water_m, "A3.5 Dist. to Water");
+      check(hazard.surface_runoff, "A3.6 Surface");
+      check(hazard.base_height, "A3.7 Base Height");
+      check(hazard.drainage_system, "A3.8 Drainage");
+    } else if (currentStep === "exposure") {
+      const eFields = ["b11", "b12", "b13", "b14", "b22", "b23", "b24", "b25", "b31", "b32", "b33", "b34", "b41", "b42", "b43", "b44"];
+      eFields.forEach(f => check((exposure as any)[f], `Exposure ${f.toUpperCase()}`));
+    } else if (currentStep === "vulnerability") {
+      check(vuln.building_code, "C1.1 Code Year Built");
+      check(vuln.plan_irregularity, "C1.2 Plan Irregularity");
+      check(vuln.vertical_irregularity, "C1.3 Vertical Irregularity");
+      check(vuln.building_proximity, "C1.4 Proximity / Pounding");
+      check(vuln.structural_material, "C1.6 System Material");
+      check(vuln.number_of_bays, "C1.7 Number of Bays");
+      check(vuln.column_spacing_m, "C1.8 Column Spacing");
+      check(vuln.building_enclosure, "C1.9 Building Enclosure");
+      check(vuln.wall_material, "C1.10 Wall Material");
+      check(vuln.structural_framing_type, "C1.11 Framing Type");
+      check(vuln.flooring_material, "C1.12 Flooring Material");
+      check(vuln.maximum_crack, "C2.1 Maximum Crack Width");
+      check(vuln.uneven_settlement, "C2.2 Uneven Settlement");
+      check(vuln.beam_column_deformations, "C2.3 Beam and Column Deformations");
+      check(vuln.finishing_condition, "C2.4 Finishing Condition Deterioration");
+      check(vuln.decay_of_structural_member, "C2.5 Decay of Structural Members");
+      check(vuln.additional_loads, "C2.6 Additional Loads");
+      check(vuln.roof_design, "C3.1 Roof Design");
+      check(vuln.roof_slope, "C3.2 Roof Slope");
+      check(vuln.roofing_material, "C3.3 Roofing Material");
+      check(vuln.roof_fastener, "C4.1 Roof Fasteners");
+      check(vuln.roof_fastener_distance_mm, "C4.2 Fastener Spacing");
+    }
+
+    if (missing.length > 0) {
+      setError(`Please fill in all required fields before proceeding. Missing: ${missing.join(", ")}`);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return false;
+    }
+    return true;
+  };
 
   async function computeAndShow() {
       console.log("🚀 START: Compute Index Pressed");
@@ -658,7 +730,7 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
                 <div><label className="label-sm block mb-2">Building Use</label><select className="input-field" value={building.building_use ?? ""} onChange={e => setB("building_use", e.target.value)}><option value="">Select…</option><option>Residential</option><option>Commercial</option><option>Mixed Use</option></select></div>
                 <div><label className="label-sm block mb-2">Floors</label><input className="input-field" value={numInputs.number_of_floors ?? building.number_of_floors ?? ""} onChange={e => { handleNum("number_of_floors", e.target.value, setB); handleNum("number_of_stories", e.target.value, setV); }} /></div>
               </div>
-              <div className="flex justify-end pt-2"><button className="btn-primary w-full sm:w-auto" onClick={() => setStep("hazard")}>Next: Hazard →</button></div>
+              <div className="flex justify-end pt-2"><button className="btn-primary w-full sm:w-auto" onClick={() => { if (validateStep("building")) setStep("hazard") }}>Next: Hazard →</button></div>
             </div>
           )}
 
@@ -685,7 +757,7 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
                 <QField label="A3.7 Base Height" sub="Low(Higher) ; Mod(Same) ; High(Lower)"><QualitativeSelect value={hazard.base_height ?? ""} options={["Base is higher","Same Level","Base is lower"]} onChange={v => setH("base_height",v)} /></QField>
                 <QField label="A3.8 Drainage" sub="Low(Regular Maintenance) ; Mod(Seldom to No Maintenance) ; High(No Drainage)"><QualitativeSelect value={hazard.drainage_system ?? ""} options={["Closed drainage system","Open drainage system","No Drainage System"]} onChange={v => setH("drainage_system",v)} /></QField>
               </Section>
-              <div className="flex justify-between pt-2"><button className="btn-secondary" onClick={() => setStep("building")}>← Back</button><button className="btn-primary" onClick={() => setStep("exposure")}>Next: Values →</button></div>
+              <div className="flex justify-between pt-2"><button className="btn-secondary" onClick={() => setStep("building")}>← Back</button><button className="btn-primary" onClick={() => { if (validateStep("hazard")) setStep("exposure") }}>Next: Values →</button></div>
             </div>
           )}
 
@@ -694,10 +766,10 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
               <h3 className="font-sora font-bold text-lg text-ink">Value Assessment (Exposure)</h3>
               
               <Section title="B1 — Architectural Value">
-                <QField label="B1.1 Theme & Proportion" sub="The aesthetic theme reflects building's proportion, decoration and landscape."><SurveySelect value={exposure.b11!} onChange={v => setE("b11", v)} /></QField>
-                <QField label="B1.2 Uniqueness" sub="The architectural style is eye-catching and unique."><SurveySelect value={exposure.b12!} onChange={v => setE("b12", v)} /></QField>
-                <QField label="B1.3 Typical Style" sub="The style is typical of its prevailing style during its era."><SurveySelect value={exposure.b13!} onChange={v => setE("b13", v)} /></QField>
-                <QField label="B1.4 Integration" sub="The style beautifully integrates into the cityscape."><SurveySelect value={exposure.b14!} onChange={v => setE("b14", v)} /></QField>
+                <QField label="B1.1 Theme & Proportion" sub="The aesthetic theme reflects building's proportion, decoration and landscape."><SurveySelect value={exposure.b11} onChange={v => setE("b11", v as number)} /></QField>
+                <QField label="B1.2 Uniqueness" sub="The architectural style is eye-catching and unique."><SurveySelect value={exposure.b12} onChange={v => setE("b12", v as number)} /></QField>
+                <QField label="B1.3 Typical Style" sub="The style is typical of its prevailing style during its era."><SurveySelect value={exposure.b13} onChange={v => setE("b13", v as number)} /></QField>
+                <QField label="B1.4 Integration" sub="The style beautifully integrates into the cityscape."><SurveySelect value={exposure.b14} onChange={v => setE("b14", v as number)} /></QField>
               </Section>
 
               <Section title="B2 — Historical Value">
@@ -706,27 +778,27 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
                     {currentYear - Number(building.year_built ?? currentYear)} years old
                   </div>
                 </QField>
-                <QField label="B2.2 Relevance" sub="past is relevant as I am able to identify with the culture and history."><SurveySelect value={exposure.b22!} onChange={v => setE("b22", v)} /></QField>
-                <QField label="B2.3 Geog. Impact" sub="Local=1 ; Regional=2 ; National=3"><SurveySelect value={exposure.b23!} onChange={v => setE("b23", v)} /></QField>
-                <QField label="B2.4 Heritage Tie" sub="History strongly ties in the area's cultural heritage."><SurveySelect value={exposure.b24!} onChange={v => setE("b24", v)} /></QField>
-                <QField label="B2.5 Important Message" sub="Relays an important message worth preserving."><SurveySelect value={exposure.b25!} onChange={v => setE("b25", v)} /></QField>
+                <QField label="B2.2 Relevance" sub="past is relevant as I am able to identify with the culture and history."><SurveySelect value={exposure.b22} onChange={v => setE("b22", v as number)} /></QField>
+                <QField label="B2.3 Geog. Impact" sub="Local=1 ; Regional=2 ; National=3"><SurveySelect value={exposure.b23} onChange={v => setE("b23", v as number)} /></QField>
+                <QField label="B2.4 Heritage Tie" sub="History strongly ties in the area's cultural heritage."><SurveySelect value={exposure.b24} onChange={v => setE("b24", v as number)} /></QField>
+                <QField label="B2.5 Important Message" sub="Relays an important message worth preserving."><SurveySelect value={exposure.b25} onChange={v => setE("b25", v as number)} /></QField>
               </Section>
 
               <Section title="B3 — Social Value">
-                <QField label="B3.1 Promotion" sub="Initiatives were seen to promote this property."><SurveySelect value={exposure.b31!} onChange={v => setE("b31", v)} /></QField>
-                <QField label="B3.2 Suggestions" sub="Prominent people strongly suggest for its conservation."><SurveySelect value={exposure.b32!} onChange={v => setE("b32", v)} /></QField>
-                <QField label="B3.3 Importance" sub="Strong sense of importance in the people's daily lives."><SurveySelect value={exposure.b33!} onChange={v => setE("b33", v)} /></QField>
-                <QField label="B3.4 No Efforts (Inverted)" sub="No efforts were made to further promote this building."><SurveySelect value={exposure.b34!} onChange={v => setE("b34", v)} /></QField>
+                <QField label="B3.1 Promotion" sub="Initiatives were seen to promote this property."><SurveySelect value={exposure.b31} onChange={v => setE("b31", v as number)} /></QField>
+                <QField label="B3.2 Suggestions" sub="Prominent people strongly suggest for its conservation."><SurveySelect value={exposure.b32} onChange={v => setE("b32", v as number)} /></QField>
+                <QField label="B3.3 Importance" sub="Strong sense of importance in the people's daily lives."><SurveySelect value={exposure.b33} onChange={v => setE("b33", v as number)} /></QField>
+                <QField label="B3.4 No Efforts (Inverted)" sub="No efforts were made to further promote this building."><SurveySelect value={exposure.b34} onChange={v => setE("b34", v as number)} /></QField>
               </Section>
 
               <Section title="B4 — Socio-Economic Value">
-                <QField label="B4.1 Tourist Attraction" sub="Must-see for the tourists eager to visit the area."><SurveySelect value={exposure.b41!} onChange={v => setE("b41", v)} /></QField>
-                <QField label="B4.2 Tourism Contrib." sub="Contributes to overall tourism in the community."><SurveySelect value={exposure.b42!} onChange={v => setE("b42", v)} /></QField>
-                <QField label="B4.3 Goods & Services" sub="Often visited for its goods and services."><SurveySelect value={exposure.b43!} onChange={v => setE("b43", v)} /></QField>
-                <QField label="B4.4 Adaptive Use" sub="Adopts needs of community without sacrificing culture."><SurveySelect value={exposure.b44!} onChange={v => setE("b44", v)} /></QField>
+                <QField label="B4.1 Tourist Attraction" sub="Must-see for the tourists eager to visit the area."><SurveySelect value={exposure.b41} onChange={v => setE("b41", v as number)} /></QField>
+                <QField label="B4.2 Tourism Contrib." sub="Contributes to overall tourism in the community."><SurveySelect value={exposure.b42} onChange={v => setE("b42", v as number)} /></QField>
+                <QField label="B4.3 Goods & Services" sub="Often visited for its goods and services."><SurveySelect value={exposure.b43} onChange={v => setE("b43", v as number)} /></QField>
+                <QField label="B4.4 Adaptive Use" sub="Adopts needs of community without sacrificing culture."><SurveySelect value={exposure.b44} onChange={v => setE("b44", v as number)} /></QField>
               </Section>
 
-              <div className="flex justify-between pt-2"><button className="btn-secondary" onClick={() => setStep("hazard")}>← Back</button><button className="btn-primary" onClick={() => setStep("vulnerability")}>Next: Vulnerability →</button></div>
+              <div className="flex justify-between pt-2"><button className="btn-secondary" onClick={() => setStep("hazard")}>← Back</button><button className="btn-primary" onClick={() => { if (validateStep("exposure")) setStep("vulnerability") }}>Next: Vulnerability →</button></div>
             </div>
           )}
 
@@ -780,7 +852,7 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
                 <QField label="C4.2 Fastener Spacing (mm)" sub="Low (<225) ; Moderate (226-450) ; High (>450)"><input className="input-field" value={numInputs.roof_fastener_distance_mm ?? vuln.roof_fastener_distance_mm ?? ""} onChange={e => handleNum("roof_fastener_distance_mm", e.target.value, setV)} /></QField>
               </Section>
 
-              <div className="flex justify-between pt-2"><button className="btn-secondary" onClick={() => setStep("exposure")}>← Back</button><button className="btn-primary" onClick={computeAndShow} disabled={loading}>Compute Index →</button></div>
+              <div className="flex justify-between pt-2"><button className="btn-secondary" onClick={() => setStep("exposure")}>← Back</button><button className="btn-primary" onClick={() => { if (validateStep("vulnerability")) computeAndShow() }} disabled={loading}>Compute Index →</button></div>
             </div>
           )}
 
