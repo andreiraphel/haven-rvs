@@ -343,27 +343,27 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
     if (currentStep === "building") {
       check(building.name, "Building Name");
       check(building.unique_code, "Unique Code");
-      check(building.year_built, "Year Built");
+      check(numInputs.year_built ?? building.year_built, "Year Built");
       check(building.address, "Address");
       check(building.municipality, "Municipality");
       check(building.province, "Province");
-      check(building.latitude, "Latitude");
-      check(building.longitude, "Longitude");
+      check(numInputs.latitude ?? building.latitude, "Latitude");
+      check(numInputs.longitude ?? building.longitude, "Longitude");
       check(building.building_type, "Building Type");
       check(building.building_use, "Building Use");
-      check(building.number_of_floors, "Floors");
+      check(numInputs.number_of_floors ?? building.number_of_floors, "Floors");
     } else if (currentStep === "hazard") {
       check(hazard.earthquake_intensity, "A1.1 Earthquake Intensity");
-      check(hazard.fault_distance_km, "A1.2 Fault Distance");
-      check(hazard.seismic_source_type, "A1.3 Source (Mw)");
+      check(numInputs.fault_distance_km ?? hazard.fault_distance_km, "A1.2 Fault Distance");
+      check(numInputs.seismic_source_type ?? hazard.seismic_source_type, "A1.3 Source (Mw)");
       check(hazard.potential_liquefaction, "A1.4 Liquefaction");
-      check(hazard.basic_wind_speed_kph, "A2.1 Wind Speed");
+      check(numInputs.basic_wind_speed_kph ?? hazard.basic_wind_speed_kph, "A2.1 Wind Speed");
       check(hazard.terrain, "A2.2 Vicinity");
       check(hazard.flood_susceptibility, "A3.1 Flood");
       check(hazard.storm_surge_height, "A3.2 Storm Surge");
       check(hazard.slope_degrees, "A3.3 Slope");
-      check(hazard.elevation_m, "A3.4 Elevation");
-      check(hazard.distance_to_water_m, "A3.5 Dist. to Water");
+      check(numInputs.elevation_m ?? hazard.elevation_m, "A3.4 Elevation");
+      check(numInputs.distance_to_water_m ?? hazard.distance_to_water_m, "A3.5 Dist. to Water");
       check(hazard.surface_runoff, "A3.6 Surface");
       check(hazard.base_height, "A3.7 Base Height");
       check(hazard.drainage_system, "A3.8 Drainage");
@@ -375,9 +375,10 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
       check(vuln.plan_irregularity, "C1.2 Plan Irregularity");
       check(vuln.vertical_irregularity, "C1.3 Vertical Irregularity");
       check(vuln.building_proximity, "C1.4 Proximity / Pounding");
+      check(numInputs.number_of_stories ?? vuln.number_of_stories, "C1.5 Number of Storeys");
       check(vuln.structural_material, "C1.6 System Material");
-      check(vuln.number_of_bays, "C1.7 Number of Bays");
-      check(vuln.column_spacing_m, "C1.8 Column Spacing");
+      check(numInputs.number_of_bays ?? vuln.number_of_bays, "C1.7 Number of Bays");
+      check(numInputs.column_spacing_m ?? vuln.column_spacing_m, "C1.8 Column Spacing");
       check(vuln.building_enclosure, "C1.9 Building Enclosure");
       check(vuln.wall_material, "C1.10 Wall Material");
       check(vuln.structural_framing_type, "C1.11 Framing Type");
@@ -392,10 +393,11 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
       check(vuln.roof_slope, "C3.2 Roof Slope");
       check(vuln.roofing_material, "C3.3 Roofing Material");
       check(vuln.roof_fastener, "C4.1 Roof Fasteners");
-      check(vuln.roof_fastener_distance_mm, "C4.2 Fastener Spacing");
+      check(numInputs.roof_fastener_distance_mm ?? vuln.roof_fastener_distance_mm, "C4.2 Fastener Spacing");
     }
 
     if (missing.length > 0) {
+      console.warn("Validation failed for step:", currentStep, "Missing fields:", missing);
       setError(`Please fill in all required fields before proceeding. Missing: ${missing.join(", ")}`);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return false;
