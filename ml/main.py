@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import pickle
 import numpy as np
+import pandas as pd
 import os
 import requests
 from dotenv import load_dotenv
@@ -268,7 +269,8 @@ def predict(req: PredictRequest):
         ml_val = 0.0; ml_cat = "UNKNOWN"
         if model_idx and model_clf and scaler:
             feats = encode_inputs(req.hazard, req.vulnerability, req.exposure, req.year_built, req.isStub)
-            X_scaled = scaler.transform([feats])
+            X_df = pd.DataFrame([feats], columns=scaler.feature_names_in_)
+            X_scaled = scaler.transform(X_df)
             ml_val = round(float(model_idx.predict(X_scaled)[0]), 6)
             cat_idx = int(model_clf.predict(X_scaled)[0])
             ml_cat = le.inverse_transform([cat_idx])[0]

@@ -511,6 +511,13 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
         if (eRes.error) throw new Error(`Exposure data failed: ${eRes.error.message}`);
         console.log("✅ Indicators Saved");
 
+        // Determine description based on the Primary (ML) Index FIRST
+        const primaryIndex = mlPred > 0 ? mlPred : manualResult.risk_index;
+        let finalDesc: RiskLevel = "LOW RISK";
+        if (primaryIndex <= 1.9) finalDesc = "LOW RISK";
+        else if (primaryIndex <= 6.1) finalDesc = "MODERATE RISK";
+        else finalDesc = "HIGH RISK";
+
         // 4. Generate AI Narrative & COA
         setComputeStatus("Generating AI Narrative & Course of Action...");
         console.log("🧠 Calling Gemini AI /api/gemini...");
@@ -522,7 +529,7 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
             body: JSON.stringify({
               buildingName: building.name,
               riskIndex: mlPred,
-              riskDescription: mlPred,
+              riskDescription: finalDesc,
               hazardData: processedHazard,
               vulnerabilityData: processedVuln,
               exposureData: finalExposure,
@@ -542,14 +549,6 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
 
         // 5. Finalize Result (ML is primary, Manual is fallback/support)
         setComputeStatus("Finalizing Risk Assessment...");
-        const primaryIndex = mlPred > 0 ? mlPred : manualResult.risk_index;
-
-        // Determine description based on the Primary (ML) Index
-        let finalDesc: RiskLevel = "LOW RISK";
-        if (primaryIndex <= 1.9) finalDesc = "LOW RISK";
-        else if (primaryIndex <= 6.1) finalDesc = "MODERATE RISK";
-        else finalDesc = "HIGH RISK";
-
         console.log("🏁 Finalizing Result...");
         
         let rErr;
@@ -797,7 +796,7 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
                   <span className="font-bold">{result.manual_index?.toFixed(5) ?? "—"}</span>
                 </div>
               </div>
-              <button className="btn-primary w-full py-4" onClick={() => router.push("/risk-summary")}>View All Summary →</button>
+              <button className="btn-primary w-full py-4" onClick={() => { router.refresh(); router.push("/risk-summary"); }}>View All Summary →</button>
             </div>
           )}
         </div>

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { GoogleGenAI } from "@google/genai";
 
 export const dynamic = "force-dynamic";
 
@@ -7,7 +8,6 @@ export async function POST(req: NextRequest) {
     const { buildingName, riskIndex, riskDescription, hazardData, vulnerabilityData, exposureData } =
       await req.json();
 
-    // Use the provided key
     const apiKey = process.env.GEMINI_API_KEY; 
 
     // Process multi-select fields
@@ -47,48 +47,81 @@ export async function POST(req: NextRequest) {
     - Priority 5: Geotechnical/Foundation address.
     - Priority 6: Monitoring protocols.
 
-    RESPONSE FORMAT: Return ONLY a JSON object with keys "narrative" and "courseOfAction".
-    Format Course of Action as: 1. **[Heading]** [Detail]\\n2. **[Heading]** [Detail]...`;
-
-    // Make raw REST call to Google AI Studio (which accepts API Keys natively)
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    CRITICAL INSTRUCTION: You must output ONLY a valid JSON object. Do not include ANY conversational text, preambles, or markdown formatting outside the JSON block.
     
-    const geminiReq = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{ text: prompt }]
-        }],
-        generationConfig: {
-          temperature: 0.2,
-          responseMimeType: "application/json",
+    EXPECTED JSON SCHEMA:
+    {
+      "narrative": "Your 5 sentence narrative here...",
+      "courseOfAction": "1. **[Heading]** [Detail]\\n2. **[Heading]** [Detail]..."
+    }`;
+
+    const ai = new GoogleGenAI({ apiKey: apiKey });
+
+    const modelsToTry = [
+      "gemma-4-31b-it",
+      "gemma-4-26b-a4b-it"
+    ];
+
+    let textResponse = "";
+    let success = false;
+    let lastError = null;
+
+    for (const modelName of modelsToTry) {
+      try {
+        const response = await ai.models.generateContent({
+          model: modelName,
+          contents: prompt,
+          config: {
+             temperature: 0.2
+          }
+        });
+        
+        textResponse = response.text;
+        console.log(`✅ Gemini API succeeded using model: ${modelName}`);
+        success = true;
+        break; // Stop looping on success
+      } catch (error: any) {
+        console.warn(`⚠️ Gemini API model ${modelName} failed:`, error.message);
+        lastError = error;
+        
+        // Check if the error is a Rate Limit (429) or Not Found (404). If it's a structural error (like 400), we probably shouldn't loop.
+        const errMsg = error.message?.toLowerCase() || "";
+        if (!errMsg.includes("429") && !errMsg.includes("404") && !errMsg.includes("503") && !errMsg.includes("quota")) {
+           // We might want to break here if it's a hard error, but keeping the loop robust
+           // for now unless it's a known bad request.
         }
-      })
-    });
-
-    const rawResponse = await geminiReq.text(); 
-
-    if (!geminiReq.ok) {
-      console.error("Gemini API Error Status:", geminiReq.status);
-      console.error("Gemini API Error Body:", rawResponse);
-      throw new Error(`Gemini request failed with status: ${geminiReq.status}. See server logs.`);
+      }
     }
 
-    let data;
-    try {
-        data = JSON.parse(rawResponse);
-    } catch(err) {
-        console.error("Failed to parse Gemini response:", rawResponse);
-        throw new Error("Gemini returned invalid JSON");
+    if (!success) {
+      console.error("❌ All Gemini API models failed.");
+      
+      // If we hit a rate limit or all models are simply missing, use fallback.
+      const lastErrMsg = lastError?.message?.toLowerCase() || "";
+      if (lastErrMsg.includes("429") || lastErrMsg.includes("quota") || lastErrMsg.includes("404")) {
+          console.warn("⚠️ Falling back to default narrative due to API unavailability.");
+          return NextResponse.json({
+            narrative: `Assessment for ${buildingName}: Index ${riskIndex} (${riskDescription}).\n\n(Note: Detailed AI narrative is temporarily unavailable due to high server traffic. Please try again later.)`,
+            courseOfAction: "1. **Structural audit.** Conduct a full structural audit by a licensed engineer.\n2. **Connection check.** Inspect all beam-column connections.\n3. **Decay check.** Look for any signs of material decay or spalling.\n4. **Disaster plan.** Update emergency response and evacuation plans."
+          });
+      }
+      
+      throw new Error(`Gemini request failed completely. Last error: ${lastError?.message}`);
     }
 
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-
-    // Clean and parse the generated AI response (safeguard just in case)
-    const cleanText = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+    // Extract JSON block if it's wrapped in markdown or has trailing text
+    let cleanText = textResponse.trim();
+    const jsonMatch = cleanText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+    if (jsonMatch) {
+      cleanText = jsonMatch[1];
+    } else {
+      // Fallback: try to find the first { and last }
+      const startIdx = cleanText.indexOf('{');
+      const endIdx = cleanText.lastIndexOf('}');
+      if (startIdx !== -1 && endIdx !== -1) {
+        cleanText = cleanText.substring(startIdx, endIdx + 1);
+      }
+    }
 
     try {
       const parsed = JSON.parse(cleanText);
@@ -97,9 +130,9 @@ export async function POST(req: NextRequest) {
         courseOfAction: parsed.courseOfAction || "1. Perform structural audit."
       });
     } catch (e) {
-      console.error("Gemini Parse Error:", text);
+      console.error("Gemini Parse Error:", textResponse);
       return NextResponse.json({
-        narrative: text.substring(0, 500),
+        narrative: textResponse.substring(0, 500),
         courseOfAction: "1. **Parsing Error** AI output format was unexpected."
       });
     }
