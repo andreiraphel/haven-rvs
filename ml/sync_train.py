@@ -386,6 +386,24 @@ metrics_df = pd.DataFrame({
     'Accuracy': ['', '', acc]
 })
 metrics_df.to_csv(os.path.join(figures_dir, 'model_metrics_summary.csv'), index=False)
+
+# Generate individual accuracy scatter plots
+print("📊 Generating individual accuracy scatter plots...")
+def plot_accuracy(y_true, y_pred, model_name, filename):
+    plt.figure(figsize=(8, 8))
+    plt.scatter(y_true, y_pred, alpha=0.3, color='blue')
+    plt.plot([y_true.min(), y_true.max()], [y_true.min(), y_true.max()], 'r--', lw=2)
+    plt.title(f'{model_name} - Actual vs Predicted Risk Index')
+    plt.xlabel('Actual Risk Index')
+    plt.ylabel('Predicted Risk Index')
+    plt.tight_layout()
+    plt.savefig(os.path.join(figures_dir, filename))
+    plt.close()
+
+plot_accuracy(y_idx_test, lr_preds, 'Linear Regression', 'linear_regression_accuracy.png')
+plot_accuracy(y_idx_test, rf_preds, 'Random Forest', 'random_forest_accuracy.png')
+plot_accuracy(y_idx_test, idx_preds, 'XGBoost', 'xgboost_accuracy.png')
+
 print("✅ Saved comparative figures and metrics summary.")
 
 # --- EXPORT ---
