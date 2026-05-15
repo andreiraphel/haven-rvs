@@ -239,8 +239,10 @@ def generate_synthetic_data(n):
         [0.85, 0.10, 0.05], # LOW risk
         [0.10, 0.80, 0.10], # MODERATE risk
         [0.01, 0.04, 0.95], # HIGH risk
-        [0.40, 0.40, 0.20], # Mixed
-        [0.20, 0.40, 0.40], # Mixed
+        [0.40, 0.40, 0.20], # Mixed Low-Mod
+        [0.20, 0.40, 0.40], # Mixed Mod
+        [0.05, 0.40, 0.55], # Mixed Mod-High (fills ~5.0 - 6.5 gap)
+        [0.05, 0.25, 0.70], # Mixed High (fills ~6.5 - 8.5 gap)
     ]:
         batch_size = target_per_class * 2
         X_block = np.random.choice([1, 2, 3], size=(batch_size, len(cols)), p=p_dist).astype(np.int8)
