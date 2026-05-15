@@ -210,7 +210,7 @@ def compute_label(feats):
     V = (c1 + c2 + c3 + c4) / 4.0
     
     idx = (H * E * V / 27.0) * 10.0
-    lbl = 0 if idx <= 3.58 else 1 if idx <= 6.79 else 2
+    lbl = 0 if idx <= 2.385 else 1 if idx <= 5.500 else 2
     return idx, lbl
 
 real_data_list = []

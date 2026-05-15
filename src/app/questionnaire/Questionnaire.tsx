@@ -514,8 +514,8 @@ export default function Questionnaire({ assessmentId }: { assessmentId?: string 
         // Determine description based on the Primary (ML) Index FIRST
         const primaryIndex = mlPred > 0 ? mlPred : manualResult.risk_index;
         let finalDesc: RiskLevel = "LOW RISK";
-        if (primaryIndex <= 1.9) finalDesc = "LOW RISK";
-        else if (primaryIndex <= 6.1) finalDesc = "MODERATE RISK";
+        if (primaryIndex <= 2.385) finalDesc = "LOW RISK";
+        else if (primaryIndex <= 5.500) finalDesc = "MODERATE RISK";
         else finalDesc = "HIGH RISK";
 
         // 4. Generate AI Narrative & COA

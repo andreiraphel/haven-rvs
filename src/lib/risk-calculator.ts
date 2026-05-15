@@ -152,7 +152,7 @@ export function calculateAssessmentRisk(
   const riskRating = hazardRating * exposureRating * vulnerabilityRating;
   const riskIndex = (riskRating / 27) * 10;
 
-  const riskDescription = riskIndex <= 1.9 ? "LOW RISK" : riskIndex <= 6.1 ? "MODERATE RISK" : "HIGH RISK";
+  const riskDescription = riskIndex <= 2.385 ? "LOW RISK" : riskIndex <= 5.500 ? "MODERATE RISK" : "HIGH RISK";
 
   return {
     building_id: "",

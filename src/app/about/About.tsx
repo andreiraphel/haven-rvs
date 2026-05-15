@@ -94,9 +94,9 @@ export default function AboutPage() {
             <div className="card p-6">
               <h3 className="font-sora font-bold text-lg text-ink mb-3">Risk Scale Reference</h3>
               <div className="space-y-2">
-                <div className="flex justify-between items-center"><span className="risk-badge-low">Low Risk</span><span className="text-xs text-[var(--ink-lt)]">Index ≤ 1.9</span></div>
-                <div className="flex justify-between items-center"><span className="risk-badge-mod">Moderate Risk</span><span className="text-xs text-[var(--ink-lt)]">2.0 – 6.1</span></div>
-                <div className="flex justify-between items-center"><span className="risk-badge-high">High Risk</span><span className="text-xs text-[var(--ink-lt)]">Index &gt; 6.1</span></div>
+                <div className="flex justify-between items-center"><span className="risk-badge-low">Low Risk</span><span className="text-xs text-[var(--ink-lt)]">Index ≤ 2.385</span></div>
+                <div className="flex justify-between items-center"><span className="risk-badge-mod">Moderate Risk</span><span className="text-xs text-[var(--ink-lt)]">2.386 – 5.500</span></div>
+                <div className="flex justify-between items-center"><span className="risk-badge-high">High Risk</span><span className="text-xs text-[var(--ink-lt)]">Index &gt; 5.500</span></div>
               </div>
             </div>
           </div>
