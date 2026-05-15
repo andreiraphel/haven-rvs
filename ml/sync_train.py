@@ -314,6 +314,9 @@ print('🚀 Training Category Classifier...')
 clf = XGBClassifier(n_estimators=500, max_depth=6, learning_rate=0.05, random_state=RANDOM_SEED, n_jobs=-1)
 clf.fit(X_train_scaled, y_lbl_train)
 
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+
 # --- EVALUATION ---
 idx_preds = reg.predict(X_test_scaled)
 lbl_preds = clf.predict(X_test_scaled)
@@ -325,6 +328,18 @@ acc = accuracy_score(y_lbl_test, lbl_preds)
 print(f"XGBoost Index Prediction (R2): {r2:.4f}")
 print(f"XGBoost Index Prediction (MAE): {mae:.4f}")
 print(f"XGBoost Category Prediction (Accuracy): {acc:.4f}")
+
+# Train baseline models for comparison
+print('\n🚀 Training Baseline Models for Comparison...')
+lr_model = LinearRegression()
+lr_model.fit(X_train_scaled, y_idx_train)
+lr_preds = lr_model.predict(X_test_scaled)
+lr_r2 = r2_score(y_idx_test, lr_preds)
+
+rf_model = RandomForestRegressor(n_estimators=100, max_depth=8, random_state=RANDOM_SEED, n_jobs=-1)
+rf_model.fit(X_train_scaled, y_idx_train)
+rf_preds = rf_model.predict(X_test_scaled)
+rf_r2 = r2_score(y_idx_test, rf_preds)
 
 # Visualizations
 base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -347,6 +362,31 @@ plt.xlabel('Relative Importance')
 plt.tight_layout()
 plt.savefig(os.path.join(figures_dir, 'feature_importance.png'))
 plt.close()
+
+# Generate Comparative Accuracy Chart
+plt.figure(figsize=(10, 6))
+models = ['Linear Regression', 'Random Forest', 'XGBoost']
+r2_scores = [lr_r2, rf_r2, r2]
+colors = ['#FF9999', '#66B2FF', '#99FF99']
+
+plt.bar(models, r2_scores, color=colors)
+plt.title('Model R2 Score Comparison')
+plt.ylabel('R2 Score')
+plt.ylim(0.95, 1.0) # Zoom in to see the difference clearly, as they are all high
+for i, v in enumerate(r2_scores):
+    plt.text(i, v + 0.001, f"{v:.4f}", ha='center', fontweight='bold')
+plt.tight_layout()
+plt.savefig(os.path.join(figures_dir, 'regression_accuracy_comparison.png'))
+plt.close()
+
+# Export Model Metrics Summary CSV
+metrics_df = pd.DataFrame({
+    'Model': ['Linear Regression', 'Random Forest', 'XGBoost'],
+    'R2_Score': [lr_r2, rf_r2, r2],
+    'Accuracy': ['', '', acc]
+})
+metrics_df.to_csv(os.path.join(figures_dir, 'model_metrics_summary.csv'), index=False)
+print("✅ Saved comparative figures and metrics summary.")
 
 # --- EXPORT ---
 export_path = os.path.join(base_dir, 'model_exports')
