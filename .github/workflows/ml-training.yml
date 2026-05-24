@@ -45,7 +45,11 @@ jobs:
       run: |
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
-        git add ml/model_exports/
+        git add ml/model_exports/ ml/figures/
         # Only commit if there are changes
-        git diff --quiet && git diff --staged --quiet || git commit -m "chore: auto-update ML models via continuous training pipeline"
-        git push
+        if ! git diff --staged --quiet; then
+          git commit -m "chore: auto-update ML models and performance reports via continuous training pipeline"
+          git push
+        else
+          echo "No changes to commit"
+        fi

@@ -327,9 +327,21 @@ print("\n--- PERFORMANCE REPORT ---")
 r2 = r2_score(y_idx_test, idx_preds)
 mae = mean_absolute_error(y_idx_test, idx_preds)
 acc = accuracy_score(y_lbl_test, lbl_preds)
+report_text = f"""--- PERFORMANCE REPORT ---
+XGBoost Index Prediction (R2): {r2:.4f}
+XGBoost Index Prediction (MAE): {mae:.4f}
+XGBoost Category Prediction (Accuracy): {acc:.4f}"""
+
 print(f"XGBoost Index Prediction (R2): {r2:.4f}")
 print(f"XGBoost Index Prediction (MAE): {mae:.4f}")
 print(f"XGBoost Category Prediction (Accuracy): {acc:.4f}")
+
+# Save the report to a text file
+base_dir = os.path.dirname(os.path.abspath(__file__))
+figures_dir = os.path.join(base_dir, 'figures')
+os.makedirs(figures_dir, exist_ok=True)
+with open(os.path.join(figures_dir, 'performance_report.txt'), 'w') as f:
+    f.write(report_text)
 
 # Train baseline models for comparison
 print('\n🚀 Training Baseline Models for Comparison...')
