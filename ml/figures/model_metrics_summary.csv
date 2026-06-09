@@ -1,4 +1,4 @@
 Model,R2_Score,Accuracy
 Linear Regression,0.9450123640389493,
-Random Forest,0.965636928027223,
+Random Forest,0.9656367741642282,
 XGBoost,0.9986917417193744,0.97605
