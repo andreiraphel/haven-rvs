@@ -1,4 +1,4 @@
 --- PERFORMANCE REPORT ---
-XGBoost Index Prediction (R2): 0.9986
-XGBoost Index Prediction (MAE): 0.0753
-XGBoost Category Prediction (Accuracy): 0.9759
+XGBoost Index Prediction (R2): 0.9987
+XGBoost Index Prediction (MAE): 0.0747
+XGBoost Category Prediction (Accuracy): 0.9756

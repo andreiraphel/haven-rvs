@@ -289,19 +289,34 @@ def generate_synthetic_data(n):
 print(f'📊 Generating {SYNTHETIC_SAMPLES} synthetic samples...')
 df_syn = generate_synthetic_data(SYNTHETIC_SAMPLES)
 
-# COMBINE REAL AND SYNTHETIC
+# SPLIT SYNTHETIC DATA FOR TRAINING & CREATE A HYBRID VALIDATION SET (SYNTHETIC + REAL)
+# 1. Split synthetic data 80/20
+df_syn_train, df_syn_val = train_test_split(df_syn, test_size=0.2, random_state=RANDOM_SEED)
+
+# 2. Training set is strictly Synthetic (80% of df_syn)
+X_train = df_syn_train.drop(['risk_index', 'risk_label'], axis=1)
+y_idx_train = df_syn_train['risk_index']
+y_lbl_train = df_syn_train['risk_label']
+
+# 3. Validation set is a hybrid of the 20% synthetic test split AND the real data from Supabase
 if real_data_list:
     df_real = pd.DataFrame(real_data_list, columns=df_syn.columns)
-    # Upsample real data to give it more weight (optional, here we just mix it)
-    df = pd.concat([df_real, df_syn]).sample(frac=1).reset_index(drop=True)
+    # Combine synthetic validation data and real validation data
+    df_val = pd.concat([df_syn_val, df_real]).sample(frac=1, random_state=RANDOM_SEED).reset_index(drop=True)
+    
+    X_test = df_val.drop(['risk_index', 'risk_label'], axis=1)
+    y_idx_test = df_val['risk_index']
+    y_lbl_test = df_val['risk_label']
+    
+    print(f"Loaded {len(X_train)} synthetic samples for training.")
+    print(f"Created a hybrid validation set of {len(X_test)} samples ({len(df_syn_val)} synthetic + {len(df_real)} real building records).")
 else:
-    df = df_syn
-
-X = df.drop(['risk_index', 'risk_label'], axis=1)
-y_idx = df['risk_index']
-y_lbl = df['risk_label']
-
-X_train, X_test, y_idx_train, y_idx_test, y_lbl_train, y_lbl_test = train_test_split(X, y_idx, y_lbl, test_size=0.2, random_state=RANDOM_SEED)
+    # Fallback if no real data is found
+    X_test = df_syn_val.drop(['risk_index', 'risk_label'], axis=1)
+    y_idx_test = df_syn_val['risk_index']
+    y_lbl_test = df_syn_val['risk_label']
+    print(f"Loaded {len(X_train)} synthetic samples for training.")
+    print(f"Loaded {len(X_test)} synthetic samples for validation (no real data found).")
 
 scaler = MinMaxScaler()
 X_train_scaled = scaler.fit_transform(X_train)
@@ -322,6 +337,12 @@ from sklearn.ensemble import RandomForestRegressor
 # --- EVALUATION ---
 idx_preds = reg.predict(X_test_scaled)
 lbl_preds = clf.predict(X_test_scaled)
+
+print("\n--- VALIDATION CLASS DISTRIBUTION ---")
+unique, counts = np.unique(y_lbl_test, return_counts=True)
+for u, c in zip(unique, counts):
+    cat = "LOW" if u == 0 else "MODERATE" if u == 1 else "HIGH"
+    print(f"  {cat} Risk: {c} records")
 
 print("\n--- PERFORMANCE REPORT ---")
 r2 = r2_score(y_idx_test, idx_preds)
@@ -369,7 +390,7 @@ plt.savefig(os.path.join(figures_dir, 'confusion_matrix.png'))
 plt.close()
 
 plt.figure(figsize=(12, 8))
-feat_importances = pd.Series(reg.feature_importances_, index=X.columns)
+feat_importances = pd.Series(reg.feature_importances_, index=X_train.columns)
 feat_importances.nlargest(20).plot(kind='barh')
 plt.title('Top 20 Features (XGBoost Importance)')
 plt.xlabel('Relative Importance')
